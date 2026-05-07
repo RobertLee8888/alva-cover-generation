@@ -398,7 +398,7 @@ function buildThesisContent(input: CoverInput): ContentElement[] {
     {
       kind: "delta",
       text: splitDelta(input.kind ?? ""),
-      category: (input.series as any) ?? "AMBIGUOUS",
+      category: input.category ?? "AMBIGUOUS",
       x: 28, y: 72,              // body cap-top (was conceptually y=44 = stack base; now explicit body y)
       fontSize: 18,
       lineHeight: 22,            // tspan dy for line 2 — keep tight, don't push delta past safe-zone bottom
@@ -479,14 +479,38 @@ export function splitDelta(text: string): string {
 }
 
 function buildWhatIfContent(input: CoverInput, bgHsl: HSL): ContentElement[] {
-  // Stub: caller passes verb/number/bars-set via extended input. This base
-  // stub just lays out the skeleton.
+  // Bars zone: x=[184,292] width 108, baseline y=120, max ≈28px tall.
+  const values = input.whatIfBars ?? [];
   const bars: BarSpec[] = [];
+  let zeroLineY = 120;
+  if (values.length > 0) {
+    const N = values.length;
+    const X0 = 184, X1 = 292, BASELINE = 120;
+    const w = (X1 - X0 - 3 * (N - 1)) / N;
+    const maxAbs = Math.max(...values.map(v => Math.abs(v)), 0.0001);
+    const scale = 28 / maxAbs;
+    const heights = values.map(v => Math.max(Math.abs(v) * scale, 4));
+    const maxNegH = values.reduce(
+      (acc, v, i) => v < 0 ? Math.max(acc, heights[i]!) : acc, 0,
+    );
+    zeroLineY = BASELINE - maxNegH;
+    values.forEach((v, i) => {
+      const isPositive = v >= 0;
+      const h = heights[i]!;
+      const x = X0 + i * (w + 3);
+      const y = isPositive ? zeroLineY - h : zeroLineY;
+      bars.push({
+        x, y, width: w, height: h,
+        color: barColorFor(bgHsl.H, isPositive),
+        isPositive,
+      });
+    });
+  }
   return [
     { kind: "label",    text: input.series ?? "", x: 28, y: 20, fontSize: 9, caps: true },
     { kind: "verb",     text: input.kind ?? "", x: 28, y: 64, fontSize: 9 },        // re-uses caps-small style; authored uppercase
     { kind: "hero-pct", text: input.anchor ?? "", x: 28, y: 80, fontSize: 40 },
-    { kind: "bars",     bars, zeroLineY: 112 },
+    { kind: "bars",     bars, zeroLineY },
   ];
 }
 

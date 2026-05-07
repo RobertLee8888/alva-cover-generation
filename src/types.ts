@@ -48,6 +48,10 @@ export type CoverInput = {
   kind?:    string;
   anchor?:  string;
   series?:  string;
+  /** Thesis only: classification for the leading dot/badge. */
+  category?: "RISK" | "CATALYST" | "AMBIGUOUS";
+  /** What-if only: signed % returns across historical episodes. */
+  whatIfBars?: number[];
   portrait?: PortraitSpec;
 };
 
