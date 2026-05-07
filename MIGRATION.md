@@ -434,4 +434,70 @@ ls demo/src/components/skill-gaps.ts                     # 应该 No such file
 
 ---
 
+---
+
+## 9. 第二轮反馈（2026-04-28，code 团队补提）
+
+发现的 3 条新 gap，已修在 commit `XXXXXX`（这个 commit 之后）：
+
+| # | 问题 | SKILL 端修法 |
+|---|---|---|
+| #1 | `CoverInput` 没有 `whatIfBars` 字段，`buildWhatIfContent` 永远返回 `bars: []`，K 线柱状图没法渲染 | `CoverInput.whatIfBars?: number[]` 新加。`buildWhatIfContent` 调 `computeWhatIfBars(values, bgHsl)` 算 BarSpec[] + zeroLineY |
+| #2 | `buildThesisContent` 错读 `input.series` 当 category，但 `series` 是 caps label 文本，caller 不会传 → 永远 fallback 到 AMBIGUOUS（金色） | `CoverInput.category?: "RISK" \| "CATALYST" \| "AMBIGUOUS"` 新加专用字段。`buildThesisContent` 改读 `input.category` |
+| #3 | `delta` 只暴露 canonical key `category`，没有本地化文本，renderer 得自己调 `localizeCategory(el.category, cover.locale)` 跟"100% data-driven"原则冲突 | `delta.categoryLabel: string` 新加，skill 内部已 `localizeCategory(category, locale)` 解析好 |
+
+**新 input 字段：**
+
+```ts
+type CoverInput = {
+  // ... existing fields ...
+  category?:    "RISK" | "CATALYST" | "AMBIGUOUS";  // thesis 模板专用
+  whatIfBars?:  number[];                            // what-if 模板专用，例 [-2.4, 1.1, -0.8, 0.3, -1.5]
+};
+```
+
+**新 output 字段：**
+
+```ts
+delta.categoryLabel: string;     // "RISK" / "风险" / "リスク" / "리스크" — 已 resolve 完
+bars: BarSpec[];                 // 真正算好的，N 个 spec 含 x/y/width/height/color/isPositive
+```
+
+**demo 端调用方变化：**
+
+```ts
+// thesis
+generateCover({
+  template: "thesis",
+  title: "Dalio Macro Cycle Tracker",
+  ...
+  kind:     "Late long-term debt cycle · risk-off bias",  // delta body
+  category: "AMBIGUOUS",                                   // ← NEW，明确传
+  // 不要用 series 传 category 了
+});
+
+// what-if
+generateCover({
+  template: "what-if",
+  ...
+  kind:        "HISTORICALLY DROPS",
+  anchor:      "−2.4%",
+  whatIfBars:  [-2.4, 1.1, -0.8, 0.3, -1.5],              // ← NEW
+});
+```
+
+**renderer 改动：thesis 类别色文本一行 read：**
+
+```tsx
+// 之前 — renderer 自己调 i18n
+<text>{localizeCategory(delta.category, cover.locale)}</text>
+
+// 之后 — 直接读已 resolve 的字段
+<text>{delta.categoryLabel}</text>
+```
+
+**这三条修完后，所有 thesis 类别色和 what-if 柱状图就跟 alva.baby 一致了。**
+
+---
+
 *问题反馈：robert@alva.xyz / #cover-system Slack*

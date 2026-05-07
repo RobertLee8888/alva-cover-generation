@@ -10,7 +10,7 @@ import {
 } from "./types";
 import {
   DEFAULT_ICON_GEOM, WHATIF_ICON_GEOM,
-  BARS_LEFT, BARS_RIGHT,
+  BARS_LEFT, BARS_RIGHT, BAR_GAP,
   CATEGORY_COLORS, FONT_WEIGHTS, TRACKED_CAPS,
 } from "./dimensions";
 
@@ -429,8 +429,9 @@ function buildThesisContent(input: CoverInput, locale: Locale, text: TextPalette
   const label  = cjk
     ? `${labels.thesisLabelPrefix} · ${anchor}`
     : `${labels.thesisLabelPrefix} · ${anchor}`.toUpperCase();
-  const category: "RISK" | "CATALYST" | "AMBIGUOUS" =
-    ((input.series as any) ?? "AMBIGUOUS");
+  // Category comes from the dedicated `input.category` field (NOT input.series —
+  // series is the caps label text and is template-agnostic).
+  const category: "RISK" | "CATALYST" | "AMBIGUOUS" = input.category ?? "AMBIGUOUS";
   return [
     { kind: "label",  text: label, x: 28, y: 24,
       fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
@@ -439,12 +440,13 @@ function buildThesisContent(input: CoverInput, locale: Locale, text: TextPalette
       kind: "delta",
       text: splitDelta(input.kind ?? "", locale),
       category,
+      categoryLabel: localizeCategory(category, locale),     // ← pre-resolved per locale
       x: 28, y: 72,
       fontSize: 18,
       lineHeight: 22,
       fontWeight: FONT_WEIGHTS.semiBold,
       letterSpacing: 0,
-      bodyColor: text.hero,                                  // textBase @ 0.92
+      bodyColor: text.hero,
       categoryX: 28,
       categoryY: 60,
       categoryFontSize: 10,
@@ -541,9 +543,9 @@ export function splitDelta(text: string, locale: Locale = DEFAULT_LOCALE): strin
 }
 
 function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale, text: TextPalette): ContentElement[] {
-  const bars: BarSpec[] = [];
   const labels = DEFAULT_LABELS[locale];
   const cjk    = isCJKLocale(locale);
+  const { bars, zeroLineY } = computeWhatIfBars(input.whatIfBars ?? [], bgHsl);
   return [
     { kind: "label",    text: input.series ?? labels.whatIfLabel, x: 28, y: 20,
       fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
@@ -556,7 +558,7 @@ function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale, text:
     {
       kind: "bars",
       bars,
-      zeroLineY: 112,
+      zeroLineY,
       barOpacity: 0.55,
       zeroLine: {
         x1: BARS_LEFT,
@@ -567,6 +569,34 @@ function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale, text:
       },
     },
   ];
+}
+
+/**
+ * Compute BarSpec[] + zeroLineY from raw signed values. Each bar's height
+ * scales relative to the absolute max in the set (cap 28 px), with a 4 px
+ * floor so tiny bars stay visible. zeroLineY = 120 − maxNegHeight, so the
+ * tallest negative bar's bottom touches the safe-zone bottom (y=120).
+ */
+function computeWhatIfBars(values: number[], bgHsl: HSL): { bars: BarSpec[]; zeroLineY: number } {
+  if (!values.length) return { bars: [], zeroLineY: 112 };
+  const N        = values.length;
+  const w        = (BARS_RIGHT - BARS_LEFT - BAR_GAP * (N - 1)) / N;
+  const maxAbs   = Math.max(...values.map(v => Math.abs(v)), 0.0001);
+  const heights  = values.map(v => Math.max(Math.abs(v) * (28 / maxAbs), 4));
+  const maxNegH  = values.reduce((a, v, i) => v < 0 ? Math.max(a, heights[i]!) : a, 0);
+  const zeroLineY = 120 - maxNegH;
+  const bars: BarSpec[] = values.map((v, i) => {
+    const isPos = v >= 0;
+    return {
+      x: BARS_LEFT + i * (w + BAR_GAP),
+      y: isPos ? zeroLineY - heights[i]! : zeroLineY,
+      width: w,
+      height: heights[i]!,
+      color: barColorFor(bgHsl.H, isPos),
+      isPositive: isPos,
+    };
+  });
+  return { bars, zeroLineY };
 }
 
 function buildGeneralContent(input: CoverInput, locale: Locale): ContentElement[] {

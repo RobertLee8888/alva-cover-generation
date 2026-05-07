@@ -53,6 +53,10 @@ export type CoverInput = {
   anchor?:  string;
   series?:  string;
   portrait?: PortraitSpec;
+  /** Thesis-only: canonical key for the category badge. Caller passes "RISK" / "CATALYST" / "AMBIGUOUS"; skill resolves color + localized label. */
+  category?: "RISK" | "CATALYST" | "AMBIGUOUS";
+  /** What-if-only: signed % values (e.g. [-2.4, 1.1, -0.8, 0.3, -1.5]). Skill computes BarSpec[] (positions, widths, heights, colors). Empty/missing → no bars. */
+  whatIfBars?: number[];
   /** Defaults to "en". Affects category translations, default labels, font stack, splitDelta separators. */
   locale?:  Locale;
 };
@@ -152,19 +156,20 @@ export type ContentElement =
       kind: "delta";
       text: string;
       category: "RISK" | "CATALYST" | "AMBIGUOUS";
+      categoryLabel: string;       // ← localized display string ("RISK"/"风险"/"リスク" etc.)
       x: number; y: number;
       fontSize: number;
       lineHeight: number;
       fontWeight: number;
       letterSpacing: number;
-      bodyColor: RGB;             // resolved — typically textBase @ hero opacity
+      bodyColor: RGB;
       categoryX: number;
       categoryY: number;
       categoryFontSize: number;
       categoryFontWeight: number;
       categoryLetterSpacing: number;
       categoryDotSize: number;
-      categoryColor: RGB;         // resolved from category key (RISK→red, CATALYST→green, AMBIGUOUS→amber)
+      categoryColor: RGB;
     }
   | ({ kind: "series";    text: string; x: number; y: number } & TextStyleFields)
   | {
