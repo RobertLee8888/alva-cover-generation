@@ -9,6 +9,10 @@ import {
   BgSpec, IconSpec, TextPalette, ContentElement, BarSpec, BrandEntry, PaletteBand,
 } from "./types";
 import {
+  DEFAULT_ICON_GEOM, WHATIF_ICON_GEOM,
+  BARS_LEFT, BARS_RIGHT,
+} from "./dimensions";
+import {
   fnv1a, hslToRgb, hexToRgb, clampPaperRegime,
   textBaseFor, deriveTextPalette, alphaOnWhite,
   iconColorFor, barColorFor, slotToHue,
@@ -86,7 +90,7 @@ export function generateCover(input: CoverInput): CoverOutput {
   );
 
   // ---- Content (per-archetype) ----
-  const content = buildContent(input, bgHsl, locale);
+  const content = buildContent(input, bgHsl, locale, text);
 
   return {
     bg,
@@ -286,10 +290,6 @@ function buildMaterialIcon(domain: string, template: Template, bgHsl: HSL): Icon
 
 function buildBrandIcon(ticker: string, brand: BrandEntry, template: Template): IconSpec {
   const geom = iconGeometryFor(template);
-  // Calibration: brand inner vector at 80% of frame (centered), opacity tuned
-  // for visual-weight match with bg-derived icons @ 1.0 in the same template.
-  //   100×100 brand → inner 80×80 at (10,10), opacity 0.40
-  //   64×64  brand → inner 51×51 at (6.4,6.4), opacity 0.50
   const opacity = geom.size === 64 ? 0.50 : 0.40;
   return {
     kind: "brand",
@@ -300,9 +300,37 @@ function buildBrandIcon(ticker: string, brand: BrandEntry, template: Template): 
     y: geom.y,
     size: geom.size,
     logoSvg: brand.logoSvg,
+    logoSlug: brand.logoSlug ?? ticker.toLowerCase(),
+    fallbackSymbol: brand.fallbackSymbol ?? "memory",
     mono: brand.mono,
   };
 }
+
+// ================================================================
+// validatePortrait — intake-time guard for portrait covers
+// ================================================================
+
+// ================================================================
+// Semantic colors + typography presets (B1, B2)
+// ================================================================
+
+/** Resolved RGB for the thesis category-badge dot. Locale-independent. */
+export const CATEGORY_COLORS: Record<"RISK" | "CATALYST" | "AMBIGUOUS", RGB> = {
+  RISK:      { r: 0.86, g: 0.15, b: 0.15 },   // ~#DC2626
+  CATALYST:  { r: 0.09, g: 0.64, b: 0.29 },   // ~#16A34A
+  AMBIGUOUS: { r: 0.85, g: 0.47, b: 0.02 },   // ~#D97706
+};
+
+/** Inter / Delight font weights used across the cover. */
+export const FONT_WEIGHTS = {
+  regular:   400,
+  medium:    500,
+  semiBold:  600,
+  bold:      700,
+} as const;
+
+/** Em-units letter-spacing for tracked caps small. 0 elsewhere. */
+export const TRACKED_CAPS = 0.16;
 
 // ================================================================
 // validatePortrait — intake-time guard for portrait covers
@@ -375,58 +403,73 @@ function iconGeometryFor(template: Template): IconGeom {
 // Content per archetype
 // ================================================================
 
-function buildContent(input: CoverInput, bgHsl: HSL, locale: Locale): ContentElement[] {
+function buildContent(input: CoverInput, bgHsl: HSL, locale: Locale, text: TextPalette): ContentElement[] {
   switch (input.template) {
-    case "screener":  return buildScreenerContent(input, locale);
-    case "thesis":    return buildThesisContent(input, locale);
-    case "what-if":   return buildWhatIfContent(input, bgHsl, locale);
+    case "screener":  return buildScreenerContent(input, locale, text);
+    case "thesis":    return buildThesisContent(input, locale, text);
+    case "what-if":   return buildWhatIfContent(input, bgHsl, locale, text);
     case "general":   return buildGeneralContent(input, locale);
   }
 }
 
-function buildScreenerContent(input: CoverInput, locale: Locale): ContentElement[] {
-  // Convention: tickers[0] = lead, tickers[1..3] = peer chips (up to 3).
+function buildScreenerContent(input: CoverInput, locale: Locale, text: TextPalette): ContentElement[] {
   const lead  = input.tickers[0] ?? "";
   const peers = input.tickers.slice(1, 4);
+  const cjk   = isCJKLocale(locale);
   return [
-    { kind: "label",  text: input.series ?? DEFAULT_LABELS[locale].screenerSeries, x: 28, y: 24, fontSize: 9, caps: true },
-    { kind: "ticker", text: lead, x: 28, y: 48, fontSize: 34 },
+    { kind: "label",  text: input.series ?? DEFAULT_LABELS[locale].screenerSeries, x: 28, y: 24,
+      fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "label", caps: !cjk },
+    { kind: "ticker", text: lead, x: 28, y: 48,
+      fontSize: 34, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: 0, paletteRole: "hero" },
     {
       kind: "peer-chips",
       tickers: peers,
-      x: 28,
-      y: 100,                    // chip top — bottom-anchored, chipBottom = 100+20 = 120 (safe-zone bottom)
-      chipHeight: 20,            // taller pill (was 18) — vertical center looks right for Delight metrics
-      chipPaddingX: 8,           // L/R padding inside each chip (was ~3 — visually too tight)
+      x: 28, y: 100,
+      chipHeight: 20,
+      chipPaddingX: 8,
       chipGap: 4,
       chipFontSize: 10,
+      chipFontWeight: FONT_WEIGHTS.semiBold,
+      chipLetterSpacing: cjk ? 0 : 0.04,
       chipBorderRadius: 4,
-      textBaselineY: 110,        // = y + chipHeight/2 — set as `y` on <text dominant-baseline="middle">
+      chipBg:        { color: text.base, opacity: 0.10 },
+      chipTextColor: text.support,                            // textBase @ 0.70
+      textBaselineY: 110,
     },
   ];
 }
 
-function buildThesisContent(input: CoverInput, locale: Locale): ContentElement[] {
+function buildThesisContent(input: CoverInput, locale: Locale, text: TextPalette): ContentElement[] {
   const labels = DEFAULT_LABELS[locale];
   const anchor = (input.anchor ?? labels.thesisAnchorTBD).toUpperCase();
   const cjk    = isCJKLocale(locale);
-  // CJK doesn't use ALL CAPS visually — keep label readable in mixed script.
   const label  = cjk
     ? `${labels.thesisLabelPrefix} · ${anchor}`
     : `${labels.thesisLabelPrefix} · ${anchor}`.toUpperCase();
+  const category: "RISK" | "CATALYST" | "AMBIGUOUS" =
+    ((input.series as any) ?? "AMBIGUOUS");
   return [
-    { kind: "label",  text: label, x: 28, y: 24, fontSize: 9, caps: !cjk },
+    { kind: "label",  text: label, x: 28, y: 24,
+      fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "label", caps: !cjk },
     {
       kind: "delta",
       text: splitDelta(input.kind ?? "", locale),
-      category: (input.series as any) ?? "AMBIGUOUS",
+      category,
       x: 28, y: 72,
       fontSize: 18,
       lineHeight: 22,
+      fontWeight: FONT_WEIGHTS.semiBold,
+      letterSpacing: 0,
+      bodyColor: text.hero,                                  // textBase @ 0.92
       categoryX: 28,
       categoryY: 60,
       categoryFontSize: 10,
+      categoryFontWeight: FONT_WEIGHTS.semiBold,
+      categoryLetterSpacing: cjk ? 0 : TRACKED_CAPS,
       categoryDotSize: 4,
+      categoryColor: CATEGORY_COLORS[category],
     },
   ];
 }
@@ -515,15 +558,32 @@ export function splitDelta(text: string, locale: Locale = DEFAULT_LOCALE): strin
   return text;
 }
 
-function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale): ContentElement[] {
+function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale, text: TextPalette): ContentElement[] {
   const bars: BarSpec[] = [];
   const labels = DEFAULT_LABELS[locale];
   const cjk    = isCJKLocale(locale);
   return [
-    { kind: "label",    text: input.series ?? labels.whatIfLabel, x: 28, y: 20, fontSize: 9, caps: !cjk },
-    { kind: "verb",     text: input.kind   ?? "", x: 28, y: 64, fontSize: 9, caps: !cjk } as any,
-    { kind: "hero-pct", text: input.anchor ?? "", x: 28, y: 80, fontSize: 40 },
-    { kind: "bars",     bars, zeroLineY: 112 },
+    { kind: "label",    text: input.series ?? labels.whatIfLabel, x: 28, y: 20,
+      fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "label", caps: !cjk },
+    { kind: "verb",     text: input.kind   ?? "", x: 28, y: 64,
+      fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "label", caps: !cjk },
+    { kind: "hero-pct", text: input.anchor ?? "", x: 28, y: 80,
+      fontSize: 40, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: 0, paletteRole: "hero" },
+    {
+      kind: "bars",
+      bars,
+      zeroLineY: 112,
+      barOpacity: 0.55,
+      zeroLine: {
+        x1: BARS_LEFT,
+        x2: BARS_RIGHT,
+        color: text.base,
+        opacity: 0.15,
+        strokeWidth: 1,
+      },
+    },
   ];
 }
 
@@ -531,9 +591,14 @@ function buildGeneralContent(input: CoverInput, locale: Locale): ContentElement[
   const labels = DEFAULT_LABELS[locale];
   const cjk    = isCJKLocale(locale);
   return [
-    { kind: "label",      text: input.kind   ?? labels.generalKind, x: 28, y: 24, fontSize: 9, caps: !cjk },
-    { kind: "hero-pulse", text: input.anchor ?? "", x: 28, y: 66, fontSize: 28 },
-    { kind: "series",     text: input.series ?? "", x: 28, y: 106 },
+    { kind: "label",      text: input.kind   ?? labels.generalKind, x: 28, y: 24,
+      fontSize: 9, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "label", caps: !cjk },
+    { kind: "hero-pulse", text: input.anchor ?? "", x: 28, y: 66,
+      fontSize: 28, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: 0, paletteRole: "hero" },
+    { kind: "series",     text: input.series ?? "", x: 28, y: 106,
+      fontSize: 10, fontWeight: FONT_WEIGHTS.semiBold, letterSpacing: cjk ? 0 : TRACKED_CAPS,
+      paletteRole: "support" },
   ];
 }
 

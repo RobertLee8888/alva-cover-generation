@@ -109,7 +109,9 @@ export type IconSpec =
       opacity: number;
       x: number; y: number;
       size: number;
-      logoSvg: string;        // relative path under a shared logos/ folder
+      logoSvg: string;        // legacy path under shared logos/
+      logoSlug: string;       // simpleicons.org slug — primary fetch target
+      fallbackSymbol: string; // Material Symbol when logo fetch fails (e.g. "smartphone")
       mono:   boolean;
     }
   | null;                     // null for portrait covers (image IS the icon layer)
@@ -121,39 +123,68 @@ export type TextPalette = {
   label:   RGB;               // base × 0.55
 };
 
+/** Which TextPalette role provides this element's color. Renderer reads `output.text[paletteRole]`. */
+export type PaletteRole = "hero" | "support" | "label" | "base";
+
+/** Common typography fields exposed on all text-bearing ContentElements (B1 gap). */
+export type TextStyleFields = {
+  fontSize: number;
+  fontWeight: number;            // 400 / 500 / 600 / 700
+  letterSpacing: number;         // em units; tracked caps ≈ 0.16
+  paletteRole: PaletteRole;      // which output.text role to use for fill
+};
+
 export type ContentElement =
-  | { kind: "label";     text: string; x: number; y: number; fontSize: number; caps: true }
-  | { kind: "ticker";    text: string; x: number; y: number; fontSize: number }
-  | { kind: "chip";      text: string; x: number; y: number }
-  | { kind: "verb";      text: string; x: number; y: number; fontSize: number }
-  | { kind: "hero-pct";  text: string; x: number; y: number; fontSize: number }
-  | { kind: "hero-pulse";text: string; x: number; y: number; fontSize: number }
+  | ({ kind: "label";     text: string; x: number; y: number; caps: boolean } & TextStyleFields)
+  | ({ kind: "ticker";    text: string; x: number; y: number } & TextStyleFields)
+  | { kind: "chip";       text: string; x: number; y: number }
+  | ({ kind: "verb";      text: string; x: number; y: number; caps: boolean } & TextStyleFields)
+  | ({ kind: "hero-pct";  text: string; x: number; y: number } & TextStyleFields)
+  | ({ kind: "hero-pulse";text: string; x: number; y: number } & TextStyleFields)
   | { kind: "delta-badge"; category: "RISK" | "CATALYST" | "AMBIGUOUS"; x: number; y: number }
   | { kind: "delta-stack"; primary: string; secondary: string | null; x: number; y: number }
   | {
       /**
-       * Thesis delta — body text contains `\n` from splitDelta; renderer
-       * must map to multi-line `<tspan>` (use `tspanLines()`). Category
-       * fields explicit so badge layout is skill-driven, not hardcoded.
+       * Thesis delta. `text` contains `\n` from splitDelta — renderer must
+       * split into per-line `<tspan>`. `bodyColor` and `categoryColor` are
+       * resolved RGBs (no renderer-side color tables needed).
        */
       kind: "delta";
       text: string;
       category: "RISK" | "CATALYST" | "AMBIGUOUS";
-      x: number; y: number;     // body cap-top
+      x: number; y: number;
       fontSize: number;
-      lineHeight: number;       // tspan dy for line 2+
+      lineHeight: number;
+      fontWeight: number;
+      letterSpacing: number;
+      bodyColor: RGB;             // resolved — typically textBase @ hero opacity
       categoryX: number;
       categoryY: number;
       categoryFontSize: number;
+      categoryFontWeight: number;
+      categoryLetterSpacing: number;
       categoryDotSize: number;
+      categoryColor: RGB;         // resolved from category key (RISK→red, CATALYST→green, AMBIGUOUS→amber)
     }
-  | { kind: "series";    text: string; x: number; y: number }
-  | { kind: "bars";      bars: BarSpec[]; zeroLineY: number }
+  | ({ kind: "series";    text: string; x: number; y: number } & TextStyleFields)
+  | {
+      /** What-if distribution bars. `zeroLine` carries the line styling so renderer doesn't hardcode it. */
+      kind: "bars";
+      bars: BarSpec[];
+      zeroLineY: number;
+      barOpacity: number;          // typically 0.55
+      zeroLine: {
+        x1: number;
+        x2: number;
+        color: RGB;
+        opacity: number;          // typically 0.15
+        strokeWidth: number;      // typically 1
+      };
+    }
   | {
       /**
-       * Screener peer-chips row. `x/y` is top-left of the FIRST chip.
-       * Renderer computes: chipWidth_i = textWidth(tickers[i]) + chipPaddingX*2,
-       * chip_x_i = x + sum(prev widths) + chipGap*i.
+       * Screener peer-chips row. Skill resolves chip bg + text color so
+       * renderer never reaches into TextPalette directly.
        */
       kind: "peer-chips";
       tickers: string[];
@@ -162,7 +193,11 @@ export type ContentElement =
       chipPaddingX: number;
       chipGap: number;
       chipFontSize: number;
+      chipFontWeight: number;
+      chipLetterSpacing: number;
       chipBorderRadius: number;
+      chipBg:        { color: RGB; opacity: number };   // typically textBase @ 0.10
+      chipTextColor: RGB;                               // typically textBase @ 0.72
       /** y for `<text dominant-baseline="middle">` = y + chipHeight/2. */
       textBaselineY: number;
     };
@@ -247,7 +282,11 @@ export type Palette = Record<Template, PaletteBand>;
 
 export type BrandEntry = {
   color:   RGB | string;     // hex string like "#76B900" or RGB
-  logoSvg: string;           // path under shared logos/ (or absolute URL)
+  logoSvg: string;           // legacy path under shared logos/ (kept for back-compat)
+  /** simpleicons.org slug, e.g. "apple", "microsoft". Renderer fetches `https://cdn.simpleicons.org/{slug}`. */
+  logoSlug?: string;
+  /** Material Symbol name to render when logo fetch fails (e.g. "smartphone" for AAPL). */
+  fallbackSymbol?: string;
   mono:    boolean;          // true = pure B/W, skip Layer 1b bg tint
   source:  string;           // attribution URL (primary)
   lastVerified: string;      // ISO date
