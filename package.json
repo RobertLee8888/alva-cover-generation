@@ -1,0 +1,46 @@
+{
+  "name": "@alva/cover-generation",
+  "version": "1.0.0",
+  "description": "Deterministic playbook cover generator for Alva's Explore grid. 4-template taxonomy, hash-derived bg, brand/portrait overrides, Figma Plugin API applicator.",
+  "license": "UNLICENSED",
+  "main": "src/cover-gen.ts",
+  "types": "src/cover-gen.ts",
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "src/",
+    "references/",
+    "examples/"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/cover-gen.ts",
+      "default": "./src/cover-gen.ts"
+    },
+    "./color": "./src/color.ts",
+    "./types": "./src/types.ts",
+    "./figma-apply": "./src/figma-apply.ts",
+    "./palette": "./src/palette.ts",
+    "./brand-registry": "./src/brand-registry.ts",
+    "./icon-mapping": "./src/icon-mapping.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Tests TBD — add in packaging phase\" && exit 0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@figma/plugin-typings": "*"
+  },
+  "keywords": [
+    "alva",
+    "cover",
+    "playbook",
+    "figma",
+    "design-system",
+    "explore"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}
