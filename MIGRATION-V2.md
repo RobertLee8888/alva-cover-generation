@@ -311,7 +311,84 @@ grep -rn "input.series.*RISK\|input.series.*CATALYST" demo/src/   # 不应该有
 
 ---
 
-## 8. 完整 commit 链（截至这次）
+## 8. Gap #4 — 无 CDN logo 的 brand path 渲染又小又重的 fallback icon
+
+### 之前的现象
+
+SPY / QQQ / JPM / IBM / LMT 等 30+ brand entry 在 `BRAND_REGISTRY` 里 (`logoSlug` 设置了，但 simpleicons.org 没收录)，单 ticker 走 brand path 时：
+1. `buildBrandIcon` 返回 `{ kind: "brand", color: brand.color }`
+2. Renderer fetch `cdn.simpleicons.org/spy` 失败
+3. 走 `fallbackSymbol`（之前默认 `"memory"`）
+4. 用 brand 色（黑/暗）+ brand 不透明度（0.40/0.50）渲染 Material Symbol
+5. 视觉效果：又小又暗的 chip，跟其它 brand 卡格格不入
+
+Demo 端不能在渲染层做"哪些 ticker 有 logo"的业务判断（每张卡在 React 组件里独立渲染）。SKILL 端必须 own 这个分支。
+
+### SKILL 端修法
+
+**新 BrandEntry 字段**（types.ts）：
+
+```ts
+type BrandEntry = {
+  // ... existing ...
+  hasCdnLogo: boolean;   // ← NEW: true 仅当 simpleicons CDN 真有 logo
+  fallbackSymbol?: string;
+  // ...
+};
+```
+
+**brand-registry.ts** — 67 个 entry 全部标了：
+
+```ts
+AAPL: { ..., hasCdnLogo: true,  logoSlug: "apple",  fallbackSymbol: "smartphone" },
+NVDA: { ..., hasCdnLogo: true,  logoSlug: "nvidia", fallbackSymbol: "memory" },
+SPY:  { ..., hasCdnLogo: false, logoSlug: "spy",    fallbackSymbol: "public" },
+JPM:  { ..., hasCdnLogo: false, logoSlug: "jpmorganchase", fallbackSymbol: "account_balance" },
+LMT:  { ..., hasCdnLogo: false, logoSlug: "lmt",    fallbackSymbol: "security" },
+ARKK: { ..., hasCdnLogo: false, logoSlug: "arkk",   fallbackSymbol: "trending_up" },
+// ... 18 个 hasCdnLogo: true（AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA,
+// AMD, INTC, PANW, CRM, ORCL, ADBE, NFLX, V, MA, NKE, SBUX）
+// ... 49 个 hasCdnLogo: false（其余 ETF + 工业/金融/消费/能源等）
+```
+
+**`generateCover` icon 分支**（cover-gen.ts）：
+
+```ts
+const icon: IconSpec = isPortrait
+  ? null
+  : brand && brand.hasCdnLogo
+    ? buildBrandIcon(input.tickers[0]!, brand, input.template)         // 真有 CDN logo
+    : brand
+      ? buildMaterialIcon(brand.fallbackSymbol ?? "memory", template, bgHsl)  // 无 CDN，走 material
+      : buildMaterialIcon(symbolForDomain(...), template, bgHsl);       // 无 brand，原 domain 路径
+```
+
+**关键**：bg path 不变。`brand && !brand.mono` 仍然走 brand bg-tinting，所以 JPM 卡的 JPM-蓝 bg 完整保留，只是 icon 从黑色 brand-path memory 换成 bg-derived `account_balance`，视觉上从"又小又重"变成"轻盈的二级图层"。
+
+### demo 端要做什么
+
+**完全无需改动**——`generateCover` 输出的 `IconSpec` 联合类型不变：
+- `kind: "brand"` 时 → 走 brand logo 渲染（CDN fetch / fallback Material Symbol）
+- `kind: "material"` 时 → 直接渲染 Material Symbol
+
+renderer 的现有 `output.icon.kind === "brand" ? <BrandLogo /> : <MaterialIcon />` 分支已经处理两种情况。skill 内部把 SPY/JPM 这类从 brand 切到 material，渲染端直接看到 `kind: "material"`，正常画 Material Symbol。
+
+唯一的"间接好处"：`<BrandLogo onError={fallback}>` 那个 fallback 分支基本不会再触发了（没有 CDN logo 的根本不走 brand path），可以保留作为最后防线但实际不会跑到。
+
+### 视觉效果
+
+| Brand | 之前 icon | 之后 icon | bg 不变 |
+|---|---|---|---|
+| AAPL | apple logo（黑/CDN） | apple logo（黑/CDN） | 不 tint（mono） |
+| NVDA | nvidia logo（绿/CDN） | nvidia logo（绿/CDN） | 绿 tint |
+| SPY  | 黑色 memory chip | bg 浅灰色 public 球 | 不 tint（mono） |
+| JPM  | 蓝色 account_balance | bg 浅蓝 account_balance | **蓝 tint 保留** |
+| LMT  | 蓝色 memory chip | bg 浅蓝 security 盾 | 蓝 tint 保留 |
+| MCD  | 黄色 memory chip | bg 浅黄 restaurant | 黄 tint 保留 |
+
+---
+
+## 9. 完整 commit 链（截至这次）
 
 ```
 bc6b79f Close 3 new gaps from code team — whatIfBars, category, categoryLabel  ← 这次
