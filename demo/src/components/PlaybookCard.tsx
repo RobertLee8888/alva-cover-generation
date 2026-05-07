@@ -47,7 +47,7 @@ export function PlaybookCard({ p, staggerMs = 0 }: { p: ExplorePlaybook; stagger
         borderRadius: 8,
         overflow: 'hidden',
         background: '#fff',
-        border: '0.5px solid rgba(0,0,0,0.3)',
+        border: '0.5px solid rgba(0,0,0,0.08)',
         display: 'flex',
         flexDirection: 'column',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
