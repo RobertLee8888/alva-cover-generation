@@ -1,5 +1,11 @@
 # alva-cover-generation
 
+### 👉 [**Open the live demo →**](https://robertlee8888.github.io/alva-cover-generation/)
+
+All 32 alva.baby playbook covers, rendered live by the skill in this repo. Filter by template (Screener / Thesis / What-If / General).
+
+---
+
 Pure-function skill for generating every Playbook cover in Alva's Explore grid.
 
 ```ts
