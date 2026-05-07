@@ -1,28 +1,138 @@
-import type { ExplorePlaybook } from '../data/playbooks';
+// Mirrors src/app/components/shared/PlaybookCard.tsx in the alva web app:
+// 4px cover inset, tag row, title (Inter 16/22 600), description (12/20),
+// creator avatar + ★/⤴ stat row at the bottom.
+
+import { useState, useMemo } from 'react';
 import { CoverRenderer } from './CoverRenderer';
+import { PlaybookTags, buildTags } from './PlaybookTags';
+import { Avatar } from './Avatar';
+import { generateCover } from '@skill/cover-gen';
+import { hslToRgb } from '@skill/color';
+import { rgbToCss } from './color-utils';
+import type { ExplorePlaybook } from '../data/playbooks';
 
 export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
-  const initial = p.creator.charAt(0).toUpperCase();
+  const tags = buildTags({
+    template: p.cover.template,
+    domain: p.cover.domain,
+    tickers: p.tickers,
+  });
+
+  const [hovered, setHovered] = useState(false);
+
+  const cover = useMemo(() => generateCover(p.cover), [p.cover]);
+  const shadowColor = useMemo(() => {
+    const { H, S } = cover.bg.hsl;
+    return rgbToCss(hslToRgb(H, Math.min(S + 0.10, 0.40), 0.30), 0.14);
+  }, [cover]);
+
   return (
-    <article className="card">
-      <div className="cover">
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        cursor: 'pointer',
+        borderRadius: 12,
+        overflow: 'hidden',
+        background: '#fff',
+        border: '0.5px solid rgba(0,0,0,0.3)',
+        display: 'flex',
+        flexDirection: 'column',
+        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: hovered ? `0 4px 12px -2px ${shadowColor}` : '0 0 0 0 transparent',
+        transition: 'transform 130ms cubic-bezier(0.2,0,0,1), box-shadow 130ms cubic-bezier(0.2,0,0,1)',
+      }}
+    >
+      <div style={{
+        margin: '4px 4px 0 4px',
+        width: 'calc(100% - 8px)',
+        aspectRatio: '320 / 140',
+        borderRadius: 8,
+        overflow: 'hidden',
+      }}>
         <CoverRenderer input={p.cover} />
       </div>
-      <div className="body">
-        <h3 className="title">{p.title}</h3>
-        <p className="description">{p.description}</p>
-        <div className="footer">
-          <span className="creator">
-            <span className="avatar">{initial}</span>
-            <span>{p.creator}</span>
-          </span>
-          <span className="stats">
-            <span>★ {p.stars}</span>
-            {p.remixes > 0 && <span>⤴ {p.remixes}</span>}
-            {p.annualizedReturn && <span style={{ color: '#1F8754', fontWeight: 600 }}>{p.annualizedReturn}</span>}
-          </span>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 16px 12px' }}>
+        <PlaybookTags tags={tags} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <p style={{
+            fontSize: 16, lineHeight: '22px', fontWeight: 600,
+            fontFamily: 'Inter, sans-serif',
+            color: 'rgba(0,0,0,0.9)', letterSpacing: '0.16px',
+            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            margin: 0,
+          }}>
+            {p.title}
+          </p>
+          <p style={{
+            fontSize: 12, lineHeight: '20px',
+            color: 'rgba(0,0,0,0.5)', letterSpacing: '0.12px',
+            margin: 0,
+            overflow: 'hidden',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+          }}>
+            {p.description}
+          </p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6, height: 22 }}>
+            <Avatar name={p.creator} size={22} />
+            <span style={{
+              fontSize: 14, lineHeight: '22px',
+              color: 'rgba(0,0,0,0.9)', letterSpacing: '0.14px',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {p.creator}
+            </span>
+          </div>
+
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
+            color: 'rgba(0,0,0,0.9)',
+          }}>
+            <Stat icon="star" value={p.stars} />
+            <Stat icon="remix" value={p.remixes} />
+          </div>
         </div>
       </div>
-    </article>
+    </div>
+  );
+}
+
+function Stat({ icon, value }: { icon: 'star' | 'remix'; value: number }) {
+  return (
+    <span style={{
+      display: 'flex', alignItems: 'center', gap: 4,
+      fontSize: 14, lineHeight: '22px', letterSpacing: '0.14px',
+    }}>
+      {icon === 'star' ? <StarIcon /> : <RemixIcon />}
+      {value}
+    </span>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function RemixIcon() {
+  // Branching remix arrows
+  return (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h6l8 12h4" />
+      <path d="M3 18h6l3-4.5" />
+      <polyline points="17 3 21 6 17 9" />
+      <polyline points="17 15 21 18 17 21" />
+    </svg>
   );
 }
