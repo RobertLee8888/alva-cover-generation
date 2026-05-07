@@ -2,20 +2,14 @@
 // Mirrors src/lib/playbook-cover/PlaybookTags.tsx in the alva web app.
 
 import { useLayoutEffect, useRef, useState } from 'react';
-import type { Template } from '@skill/types';
+import type { Template, Locale } from '@skill/types';
 import { BRAND_REGISTRY } from '@skill/brand-registry';
 import { BrandLogoMark } from './BrandLogoMark';
+import { TEMPLATE_LABELS, DOMAIN_LABELS } from '../i18n';
 
 export type Tag =
   | { kind: 'template'; template: Template }
-  | { kind: 'subject'; label: string };
-
-const TEMPLATE_LABEL: Record<Template, string> = {
-  screener: 'Screener',
-  thesis: 'Thesis',
-  'what-if': 'What-If',
-  general: 'General',
-};
+  | { kind: 'subject'; label: string; isLocalized?: boolean };  // brand tickers stay raw
 
 const TEMPLATE_STYLE: Record<Template, { bg: string; fg: string }> = {
   screener: { bg: '#ebf6f4', fg: '#0e493c' },
@@ -26,7 +20,7 @@ const TEMPLATE_STYLE: Record<Template, { bg: string; fg: string }> = {
 
 const SUBJECT_STYLE = { bg: '#f2f2f2', fg: 'rgba(0,0,0,0.65)' };
 
-export function PlaybookTags({ tags, gap = 6 }: { tags: Tag[]; gap?: number }) {
+export function PlaybookTags({ tags, gap = 6, locale }: { tags: Tag[]; gap?: number; locale: Locale }) {
   const ghostRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(tags.length);
@@ -79,16 +73,16 @@ export function PlaybookTags({ tags, gap = 6 }: { tags: Tag[]; gap?: number }) {
           whiteSpace: 'nowrap',
         }}
       >
-        {tags.map((tag, i) => <TagPill key={`g-${i}`} tag={tag} />)}
+        {tags.map((tag, i) => <TagPill key={`g-${i}`} tag={tag} locale={locale} />)}
       </div>
       {tags.slice(0, visibleCount).map((tag, i) => (
-        <TagPill key={i} tag={tag} />
+        <TagPill key={i} tag={tag} locale={locale} />
       ))}
     </div>
   );
 }
 
-function TagPill({ tag }: { tag: Tag }) {
+function TagPill({ tag, locale }: { tag: Tag; locale: Locale }) {
   if (tag.kind === 'template') {
     const style = TEMPLATE_STYLE[tag.template];
     return (
@@ -102,11 +96,12 @@ function TagPill({ tag }: { tag: Tag }) {
           fontFamily: 'Inter, sans-serif', fontSize: 11, lineHeight: '14px',
           fontWeight: 500, color: style.fg, whiteSpace: 'nowrap',
         }}>
-          {TEMPLATE_LABEL[tag.template]}
+          {TEMPLATE_LABELS[locale][tag.template]}
         </span>
       </div>
     );
   }
+  const displayLabel = tag.isLocalized ? (DOMAIN_LABELS[locale][tag.label] ?? tag.label) : tag.label;
   const brand = BRAND_REGISTRY[tag.label];
   return (
     <div style={{
@@ -127,7 +122,7 @@ function TagPill({ tag }: { tag: Tag }) {
         fontFamily: 'Inter, sans-serif', fontSize: 11, lineHeight: '14px',
         fontWeight: 500, color: SUBJECT_STYLE.fg, whiteSpace: 'nowrap',
       }}>
-        {tag.label}
+        {displayLabel}
       </span>
     </div>
   );
@@ -162,25 +157,16 @@ function TemplateGlyph({ template, color }: { template: Template; color: string 
   );
 }
 
-const DOMAIN_LABEL: Record<string, string> = {
-  tech: 'Tech', software: 'Software', ai: 'AI', crypto: 'Crypto',
-  dividend: 'Dividend', value: 'Value', growth: 'Growth', momentum: 'Momentum',
-  defense: 'Defense', energy: 'Energy', renewables: 'Renewables', biotech: 'Biotech',
-  healthcare: 'Healthcare', retail: 'Retail', consumer_staples: 'Staples',
-  real_estate: 'REIT', banks: 'Banks', fed: 'Fed', macro: 'Macro', rates: 'Rates',
-  fx: 'FX', commodities: 'Commodities', trend_up: 'Bullish', trend_down: 'Bearish',
-  trend_flat: 'Flat', event_study: 'Event Study', earnings: 'Earnings',
-  guide: 'Guide', weekly: 'Weekly', review: 'Review', watchlist: 'Watchlist',
-  alerts: 'Alerts', leaderboard: 'Leaderboard',
-};
+// Domain key allow-list — anything not in this set won't get a tag rendered.
+const DOMAIN_KEYS = new Set(Object.keys(DOMAIN_LABELS.en));
 
 export function buildTags(opts: { template: Template; domain?: string; tickers: string[] }): Tag[] {
   const tags: Tag[] = [];
   if (opts.template !== 'general') {
     tags.push({ kind: 'template', template: opts.template });
   }
-  if (opts.domain && DOMAIN_LABEL[opts.domain]) {
-    tags.push({ kind: 'subject', label: DOMAIN_LABEL[opts.domain] });
+  if (opts.domain && DOMAIN_KEYS.has(opts.domain)) {
+    tags.push({ kind: 'subject', label: opts.domain, isLocalized: true });
   }
   for (const t of opts.tickers) {
     if (t.length <= 5) tags.push({ kind: 'subject', label: t });

@@ -26,6 +26,13 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
     const { H, S } = cover.bg.hsl;
     return rgbToCss(hslToRgb(H, Math.min(S + 0.10, 0.40), 0.30), 0.14);
   }, [cover]);
+  // SKILL-driven font stack — primary (e.g. Delight) + locale-aware CJK fallbacks.
+  const metaFontFamily = useMemo(
+    () => [cover.fonts.metadata.primary, ...cover.fonts.metadata.fallbacks]
+      .map(f => /[ ]/.test(f) && !f.startsWith('"') ? `"${f}"` : f)
+      .join(', '),
+    [cover.fonts.metadata],
+  );
 
   return (
     <div
@@ -58,11 +65,11 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 16px 12px' }}>
-        <PlaybookTags tags={tags} />
+        <PlaybookTags tags={tags} locale={p.cover.locale ?? 'en'} />
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           <p style={{
             fontSize: 16, lineHeight: '22px', fontWeight: 600,
-            fontFamily: 'Inter, sans-serif',
+            fontFamily: metaFontFamily,
             color: 'rgba(0,0,0,0.9)', letterSpacing: '0.16px',
             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
             margin: 0,
@@ -71,6 +78,7 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
           </p>
           <p style={{
             fontSize: 12, lineHeight: '20px',
+            fontFamily: metaFontFamily,
             color: 'rgba(0,0,0,0.5)', letterSpacing: '0.12px',
             margin: 0,
             overflow: 'hidden',

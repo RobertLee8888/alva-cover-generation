@@ -1,28 +1,24 @@
-// Renders the SKILL's CoverOutput as SVG.
+// 100% data-driven SVG renderer for the SKILL's CoverOutput.
 //
-// CONSTRAINT: every visible value (color, opacity, position, font size, ...)
-// must come from the SKILL output OR from `skill-gaps.ts` — which is a
-// transitional file that lists values the SKILL should expose but doesn't yet.
-// No constants live in this file.
-//
-// To change cover behavior: edit src/cover-gen.ts (or, where the gap requires
-// it, the corresponding entry in skill-gaps.ts AND open a SKILL gap to
-// migrate it). Never edit this file with new values.
+// Every value (color, font, opacity, position, dimension) comes from the
+// SKILL output or @skill/dimensions. There are no constants in this file.
+// To change cover behavior: edit the SKILL.
 
 import { useMemo } from 'react';
-import type { CoverInput, CoverOutput, ContentElement, RGB, TextPalette } from '@skill/types';
+import type {
+  CoverInput, CoverOutput, ContentElement, RGB, TextPalette, FontStack, Locale,
+} from '@skill/types';
 import { generateCover } from '@skill/cover-gen';
 import { materialSymbolUrl } from '@skill/icon-mapping';
+import { COVER_W, COVER_H } from '@skill/dimensions';
+import { localizeCategory } from '@skill/i18n';
 import { rgbToCss } from './color-utils';
 import { BrandLogo } from './BrandLogo';
-import {
-  COVER_W, COVER_H, FONT_FAMILY,
-  CATEGORY_COLORS, TYPOGRAPHY, CHIP_STYLE, BARS_STYLE,
-} from './skill-gaps';
 
 export function CoverRenderer({ input }: { input: CoverInput }) {
   const cover: CoverOutput = useMemo(() => generateCover(input), [input]);
-  const { bg, icon, text, content } = cover;
+  const { bg, icon, text, content, fonts } = cover;
+  const fontFamily = stackToCss(fonts.cover);
   const uid = useMemo(() => `cv${Math.random().toString(36).slice(2, 9)}`, []);
   const gradId = `${uid}-bg`;
   const portrait = bg.portraitRender;
@@ -82,83 +78,58 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
       )}
 
       {content.map((el, i) => (
-        <ContentEl key={i} el={el} text={text} />
+        <ContentEl key={i} el={el} text={text} fontFamily={fontFamily} locale={cover.locale} />
       ))}
     </svg>
   );
 }
 
-function paletteColor(text: TextPalette, role: keyof TextPalette): string {
-  return rgbToCss(text[role]);
+function stackToCss(stack: FontStack): string {
+  const all = [stack.primary, ...stack.fallbacks];
+  return all.map(f => /[ ]/.test(f) && !f.startsWith('"') ? `"${f}"` : f).join(', ');
 }
 
-function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
+function ContentEl({
+  el, text, fontFamily, locale,
+}: { el: ContentElement; text: TextPalette; fontFamily: string; locale: Locale }) {
   switch (el.kind) {
-    case 'label': {
-      const t = TYPOGRAPHY.caps;
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={paletteColor(text, t.paletteRole)}
-          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
-          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
-        >
-          {el.text.toUpperCase()}
-        </text>
-      );
-    }
-
+    case 'label':
     case 'verb': {
-      const t = TYPOGRAPHY.caps;
+      const display = el.caps ? el.text.toUpperCase() : el.text;
       return (
         <text
           x={el.x} y={el.y}
-          fill={paletteColor(text, t.paletteRole)}
-          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
-          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+          fill={rgbToCss(text[el.paletteRole])}
+          fontFamily={fontFamily} fontSize={el.fontSize} fontWeight={el.fontWeight}
+          letterSpacing={`${el.letterSpacing}em`} dominantBaseline="hanging"
         >
-          {el.text.toUpperCase()}
+          {display}
         </text>
       );
     }
 
     case 'series': {
-      const t = TYPOGRAPHY.caps;
       return (
         <text
           x={el.x} y={el.y}
-          fill={paletteColor(text, t.paletteRole)}
-          fontFamily={FONT_FAMILY} fontSize={9} fontWeight={t.fontWeight}
-          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
-        >
-          {el.text.toUpperCase()}
-        </text>
-      );
-    }
-
-    case 'ticker':
-    case 'hero-pulse': {
-      const t = TYPOGRAPHY.hero;
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={paletteColor(text, t.paletteRole)}
-          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
-          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+          fill={rgbToCss(text[el.paletteRole])}
+          fontFamily={fontFamily} fontSize={el.fontSize} fontWeight={el.fontWeight}
+          letterSpacing={`${el.letterSpacing}em`} dominantBaseline="hanging"
         >
           {el.text}
         </text>
       );
     }
 
+    case 'ticker':
+    case 'hero-pulse':
     case 'hero-pct': {
-      const t = TYPOGRAPHY.heroPct;
       return (
         <text
           x={el.x} y={el.y}
-          fill={paletteColor(text, t.paletteRole)}
-          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
-          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+          fill={rgbToCss(text[el.paletteRole])}
+          fontFamily={fontFamily} fontSize={el.fontSize} fontWeight={el.fontWeight}
+          letterSpacing={`${el.letterSpacing}em`} dominantBaseline="hanging"
         >
           {el.text}
         </text>
@@ -166,9 +137,8 @@ function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
     }
 
     case 'peer-chips': {
-      const t = TYPOGRAPHY.chipText;
-      const bgRgba = rgbToCss(text[CHIP_STYLE.bgRole], CHIP_STYLE.bgOpacity);
-      const fg = paletteColor(text, t.paletteRole);
+      const bgColor = rgbToCss(el.chipBg.color, el.chipBg.opacity);
+      const fgColor = rgbToCss(el.chipTextColor);
       let cursor = el.x;
       const chips = el.tickers.map((tk, i) => {
         const w = el.chipPaddingX * 2 + tk.length * (el.chipFontSize * 0.62);
@@ -178,13 +148,13 @@ function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
               x={cursor} y={el.y - 1}
               width={w} height={el.chipHeight}
               rx={el.chipBorderRadius}
-              fill={bgRgba}
+              fill={bgColor}
             />
             <text
               x={cursor + w / 2} y={el.textBaselineY}
-              fill={fg}
-              fontFamily={FONT_FAMILY} fontSize={el.chipFontSize}
-              fontWeight={t.fontWeight} letterSpacing={t.letterSpacing}
+              fill={fgColor}
+              fontFamily={fontFamily} fontSize={el.chipFontSize}
+              fontWeight={el.chipFontWeight} letterSpacing={`${el.chipLetterSpacing}em`}
               textAnchor="middle" dominantBaseline="middle"
             >
               {tk}
@@ -198,31 +168,34 @@ function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
     }
 
     case 'delta': {
-      const t = TYPOGRAPHY.hero;
-      const catColor = CATEGORY_COLORS[el.category];
       const lines = el.text.split('\n');
-      const bodyColor = paletteColor(text, t.paletteRole);
       return (
         <>
           <g>
-            <circle cx={el.categoryX + 3} cy={el.categoryY} r={el.categoryDotSize / 2} fill={catColor} />
+            <circle
+              cx={el.categoryX + 3}
+              cy={el.categoryY}
+              r={el.categoryDotSize / 2}
+              fill={rgbToCss(el.categoryColor)}
+            />
             <text
               x={el.categoryX + 10} y={el.categoryY}
-              fill={catColor}
-              fontFamily={FONT_FAMILY} fontSize={el.categoryFontSize}
-              fontWeight={t.fontWeight} letterSpacing={TYPOGRAPHY.caps.letterSpacing}
+              fill={rgbToCss(el.categoryColor)}
+              fontFamily={fontFamily} fontSize={el.categoryFontSize}
+              fontWeight={el.categoryFontWeight}
+              letterSpacing={`${el.categoryLetterSpacing}em`}
               dominantBaseline="middle"
             >
-              {el.category}
+              {localizeCategory(el.category, locale)}
             </text>
           </g>
           {lines.map((line, i) => (
             <text
               key={i}
               x={el.x} y={el.y + i * el.lineHeight}
-              fill={bodyColor}
-              fontFamily={FONT_FAMILY} fontSize={el.fontSize}
-              fontWeight={t.fontWeight} letterSpacing={t.letterSpacing}
+              fill={rgbToCss(el.bodyColor)}
+              fontFamily={fontFamily} fontSize={el.fontSize}
+              fontWeight={el.fontWeight} letterSpacing={`${el.letterSpacing}em`}
               dominantBaseline="hanging"
             >
               {line}
@@ -233,21 +206,21 @@ function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
     }
 
     case 'bars': {
-      const lineColor = rgbToCss(text[BARS_STYLE.zeroLineColor], BARS_STYLE.zeroLineOpacity);
       return (
         <>
           {el.bars.length > 0 && (
             <line
-              x1={BARS_STYLE.zoneX1} x2={BARS_STYLE.zoneX2}
+              x1={el.zeroLine.x1} x2={el.zeroLine.x2}
               y1={el.zeroLineY} y2={el.zeroLineY}
-              stroke={lineColor} strokeWidth={BARS_STYLE.zeroLineStroke}
+              stroke={rgbToCss(el.zeroLine.color, el.zeroLine.opacity)}
+              strokeWidth={el.zeroLine.strokeWidth}
             />
           )}
           {el.bars.map((b, i) => (
             <rect
               key={i}
               x={b.x} y={b.y} width={b.width} height={b.height}
-              fill={rgbToCss(b.color, BARS_STYLE.barOpacity)} rx={1}
+              fill={rgbToCss(b.color, el.barOpacity)} rx={1}
             />
           ))}
         </>
@@ -257,8 +230,7 @@ function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
     case 'chip':
     case 'delta-badge':
     case 'delta-stack':
-      // The SKILL's current cover-gen.ts doesn't emit these for our inputs.
-      // If/when it does, render here.
+      // Not currently emitted by the SKILL for our inputs. Wire when needed.
       return null;
 
     default:
