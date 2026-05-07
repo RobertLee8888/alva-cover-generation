@@ -292,6 +292,16 @@ export type BrandEntry = {
   logoSlug?: string;
   /** Material Symbol name to render when logo fetch fails (e.g. "smartphone" for AAPL). */
   fallbackSymbol?: string;
+  /**
+   * `true` only when simpleicons CDN actually serves a logo for `logoSlug`.
+   * `false` for ETFs (SPY, QQQ, VOO, …) and for brands without CDN coverage
+   * (LMT, RTX, JPM, IBM, …). When false, generateCover routes the icon through
+   * the Material Symbol path (using `fallbackSymbol` + bg-derived color) while
+   * keeping brand bg-tinting intact for non-mono brands. Without this flag,
+   * the brand path renders a tiny dark Material Symbol in brand color, which
+   * looks broken.
+   */
+  hasCdnLogo: boolean;
   mono:    boolean;          // true = pure B/W, skip Layer 1b bg tint
   source:  string;           // attribution URL (primary)
   lastVerified: string;      // ISO date

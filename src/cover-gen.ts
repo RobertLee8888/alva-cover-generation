@@ -76,15 +76,20 @@ export function generateCover(input: CoverInput): CoverOutput {
       : buildGradient(bgHsl, "hashed");
 
   // ---- Layer 2: icon ----
+  // Brand path splits two ways: with CDN logo → buildBrandIcon (logoSlug + brand color);
+  // without CDN logo → buildMaterialIcon (uses brand.fallbackSymbol + bg-derived color).
+  // Brand bg-tinting is independent of icon path — non-mono brands keep their bg-tint.
   const icon: IconSpec = isPortrait
     ? null
-    : brand
+    : brand && brand.hasCdnLogo
       ? buildBrandIcon(input.tickers[0]!, brand, input.template)
-      : buildMaterialIcon(
-          resolveDomain(input.template, input.title, input.tickers, input.domain) ?? fallbackDomain(input.template),
-          input.template,
-          bgHsl,
-        );
+      : brand
+        ? buildMaterialIcon(brand.fallbackSymbol ?? "memory", input.template, bgHsl)
+        : buildMaterialIcon(
+            symbolForDomain(resolveDomain(input.template, input.title, input.tickers, input.domain) ?? fallbackDomain(input.template)),
+            input.template,
+            bgHsl,
+          );
 
   // ---- Text palette ----
   const text: TextPalette = deriveTextPalette(
@@ -275,8 +280,7 @@ function brandBgHsl(brand: BrandEntry, band: PaletteBand): HSL {
 // Icon
 // ================================================================
 
-function buildMaterialIcon(domain: string, template: Template, bgHsl: HSL): IconSpec {
-  const symbol = DOMAIN_TO_SYMBOL[domain as keyof typeof DOMAIN_TO_SYMBOL] ?? "menu_book";
+function buildMaterialIcon(symbol: string, template: Template, bgHsl: HSL): IconSpec {
   const color = iconColorFor(bgHsl);
   const geom = iconGeometryFor(template);
   return {
@@ -290,6 +294,11 @@ function buildMaterialIcon(domain: string, template: Template, bgHsl: HSL): Icon
     y: geom.y,
     size: geom.size,
   };
+}
+
+/** Resolve a domain key to a Material Symbol with a sensible fallback. */
+function symbolForDomain(domain: string): string {
+  return DOMAIN_TO_SYMBOL[domain as keyof typeof DOMAIN_TO_SYMBOL] ?? "menu_book";
 }
 
 function buildBrandIcon(ticker: string, brand: BrandEntry, template: Template): IconSpec {
