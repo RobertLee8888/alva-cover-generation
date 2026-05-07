@@ -18,7 +18,6 @@ import { BrandLogo } from './BrandLogo';
 import {
   COVER_W, COVER_H, FONT_FAMILY,
   CATEGORY_COLORS, TYPOGRAPHY, CHIP_STYLE, BARS_STYLE,
-  BRAND_LOGO_SLUG,
 } from './skill-gaps';
 
 export function CoverRenderer({ input }: { input: CoverInput }) {
@@ -74,11 +73,11 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
 
       {icon?.kind === 'brand' && (
         <BrandLogo
-          slug={BRAND_LOGO_SLUG[icon.ticker]?.logoSlug ?? icon.ticker.toLowerCase()}
+          slug={icon.logoSlug}
           color={rgbToCssHex(icon.color)}
           size={icon.size} opacity={icon.opacity}
           x={icon.x} y={icon.y}
-          fallbackSymbol={BRAND_LOGO_SLUG[icon.ticker]?.fallbackSymbol ?? 'memory'}
+          fallbackSymbol={icon.fallbackSymbol}
         />
       )}
 

@@ -52,32 +52,5 @@ export const BARS_STYLE = {
   barOpacity:  0.55,
 } as const;
 
-// ----- Brand registry slug + fallback symbol (gap A) -----
-// Should be on the SKILL's BrandEntry: logoSlug + fallbackSymbol.
-// Until then, this map fills in for the tickers we display.
-// Mirrors alva-freshman's src/lib/playbook-cover/brand-registry.ts.
-export const BRAND_LOGO_SLUG: Record<string, { logoSlug: string; fallbackSymbol: string }> = {
-  AAPL:  { logoSlug: 'apple',      fallbackSymbol: 'phone_iphone' },
-  AMZN:  { logoSlug: 'amazon',     fallbackSymbol: 'shopping_cart' },
-  GOOGL: { logoSlug: 'google',     fallbackSymbol: 'search' },
-  META:  { logoSlug: 'meta',       fallbackSymbol: 'groups' },
-  MSFT:  { logoSlug: 'microsoft',  fallbackSymbol: 'window' },
-  NVDA:  { logoSlug: 'nvidia',     fallbackSymbol: 'memory' },
-  TSLA:  { logoSlug: 'tesla',      fallbackSymbol: 'directions_car' },
-  AMD:   { logoSlug: 'amd',        fallbackSymbol: 'memory' },
-  INTC:  { logoSlug: 'intel',      fallbackSymbol: 'memory' },
-  ORCL:  { logoSlug: 'oracle',     fallbackSymbol: 'database' },
-  ADBE:  { logoSlug: 'adobe',      fallbackSymbol: 'brush' },
-  CRM:   { logoSlug: 'salesforce', fallbackSymbol: 'cloud' },
-  NFLX:  { logoSlug: 'netflix',    fallbackSymbol: 'movie' },
-  SHOP:  { logoSlug: 'shopify',    fallbackSymbol: 'shopping_bag' },
-  COIN:  { logoSlug: 'coinbase',   fallbackSymbol: 'currency_bitcoin' },
-  PLTR:  { logoSlug: 'palantir',   fallbackSymbol: 'shield' },
-  SNOW:  { logoSlug: 'snowflake',  fallbackSymbol: 'ac_unit' },
-  UBER:  { logoSlug: 'uber',       fallbackSymbol: 'local_taxi' },
-  ABNB:  { logoSlug: 'airbnb',     fallbackSymbol: 'home' },
-  SPOT:  { logoSlug: 'spotify',    fallbackSymbol: 'music_note' },
-  BTC:   { logoSlug: 'bitcoin',    fallbackSymbol: 'currency_bitcoin' },
-  ETH:   { logoSlug: 'ethereum',   fallbackSymbol: 'currency_bitcoin' },
-  SOL:   { logoSlug: 'solana',     fallbackSymbol: 'currency_bitcoin' },
-};
+// ✅ Gap A closed: BrandEntry now has `logoSlug` + `fallbackSymbol` and
+// IconSpec brand variant exposes them too — read from SKILL output directly.

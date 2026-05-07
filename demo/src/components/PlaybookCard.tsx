@@ -98,7 +98,7 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
             display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
             color: 'rgba(0,0,0,0.9)',
           }}>
-            <Stat icon="star-l" value={p.stars} />
+            <Stat icon="show-l" value={p.stars} />
             <Stat icon="remix-l" value={p.remixes} />
           </div>
         </div>
@@ -107,7 +107,7 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
   );
 }
 
-function Stat({ icon, value }: { icon: 'star-l' | 'remix-l'; value: number }) {
+function Stat({ icon, value }: { icon: string; value: number }) {
   return (
     <span style={{
       display: 'flex', alignItems: 'center', gap: 4,
