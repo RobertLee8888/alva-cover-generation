@@ -3,6 +3,10 @@
 
 export type Template = "screener" | "thesis" | "what-if" | "general";
 
+// Re-export from i18n.ts so callers can import everything from "./types"
+export type { Locale, Direction, FontStack, FontConfig, CategoryKey } from "./i18n";
+import type { Locale, Direction, FontConfig } from "./i18n";
+
 export type DomainKey =
   // universal
   | "tech" | "software" | "ai" | "crypto"
@@ -48,11 +52,9 @@ export type CoverInput = {
   kind?:    string;
   anchor?:  string;
   series?:  string;
-  /** Thesis only: classification for the leading dot/badge. */
-  category?: "RISK" | "CATALYST" | "AMBIGUOUS";
-  /** What-if only: signed % returns across historical episodes. */
-  whatIfBars?: number[];
   portrait?: PortraitSpec;
+  /** Defaults to "en". Affects category translations, default labels, font stack, splitDelta separators. */
+  locale?:  Locale;
 };
 
 // ---------- Output ----------
@@ -190,6 +192,18 @@ export type CoverOutput = {
     chip:     MetaTextRole;
     author:   MetaTextRole;
   };
+
+  /** Locale resolved by `generateCover` (defaults to "en" when input omits it). */
+  locale: Locale;
+  /** Reading direction. All currently supported locales are "ltr". */
+  direction: Direction;
+  /**
+   * Font stacks for cover and metadata. Renderer applies as
+   * `font-family: "Primary", Fallback1, Fallback2, …` so CJK glyphs fall
+   * through correctly when the primary face has no CJK coverage (e.g.
+   * Delight / Inter Latin-only).
+   */
+  fonts: FontConfig;
 
   // Debug trace for audits — safe to ignore in production rendering
   debug?: {

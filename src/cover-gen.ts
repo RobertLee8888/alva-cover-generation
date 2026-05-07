@@ -25,6 +25,18 @@ import {
   FIGMA_TITLE_LAYOUT,
   FIGMA_SUBTITLE_LAYOUT,
 } from "./metadata-layout";
+import {
+  Locale,
+  DEFAULT_LOCALE,
+  DEFAULT_LABELS,
+  LOCALE_SEPARATORS,
+  isCJKLocale,
+  directionFor,
+  localizeCategory,
+  getCoverFontStack,
+  getMetadataFontStack,
+  maxCharsForWidth,
+} from "./i18n";
 
 // ================================================================
 // Main entry
@@ -37,6 +49,7 @@ import {
 export function generateCover(input: CoverInput): CoverOutput {
   if (input.portrait) validatePortrait(input);
 
+  const locale = input.locale ?? DEFAULT_LOCALE;
   const band = PALETTE[input.template];
   const brand = getBrand(input.tickers);
   const isPortrait = !!input.portrait;
@@ -73,7 +86,7 @@ export function generateCover(input: CoverInput): CoverOutput {
   );
 
   // ---- Content (per-archetype) ----
-  const content = buildContent(input, bgHsl);
+  const content = buildContent(input, bgHsl, locale);
 
   return {
     bg,
@@ -81,6 +94,12 @@ export function generateCover(input: CoverInput): CoverOutput {
     text,
     content,
     meta: buildMetaLayout(),
+    locale,
+    direction: directionFor(locale),
+    fonts: {
+      cover:    getCoverFontStack(locale),
+      metadata: getMetadataFontStack(locale),
+    },
     debug: {
       hashSlot: !brand && !isPortrait ? hashSlot(input.title, input.tickers) : undefined,
       inferredDomain: !input.domain && !isPortrait && !brand
@@ -356,24 +375,21 @@ function iconGeometryFor(template: Template): IconGeom {
 // Content per archetype
 // ================================================================
 
-function buildContent(input: CoverInput, bgHsl: HSL): ContentElement[] {
+function buildContent(input: CoverInput, bgHsl: HSL, locale: Locale): ContentElement[] {
   switch (input.template) {
-    case "screener":  return buildScreenerContent(input);
-    case "thesis":    return buildThesisContent(input);
-    case "what-if":   return buildWhatIfContent(input, bgHsl);
-    case "general":   return buildGeneralContent(input);
+    case "screener":  return buildScreenerContent(input, locale);
+    case "thesis":    return buildThesisContent(input, locale);
+    case "what-if":   return buildWhatIfContent(input, bgHsl, locale);
+    case "general":   return buildGeneralContent(input, locale);
   }
 }
 
-function buildScreenerContent(input: CoverInput): ContentElement[] {
-  // Caller must provide a contextLabel/leadTicker/peers via the `tickers` array.
+function buildScreenerContent(input: CoverInput, locale: Locale): ContentElement[] {
   // Convention: tickers[0] = lead, tickers[1..3] = peer chips (up to 3).
-  // contextLabel is fabricated here as a placeholder — in production, the caller
-  // should pass a pre-built label via input.series (or an extended input type).
   const lead  = input.tickers[0] ?? "";
   const peers = input.tickers.slice(1, 4);
   return [
-    { kind: "label",  text: input.series ?? "SCORED · DAILY · 6H", x: 28, y: 24, fontSize: 9, caps: true },
+    { kind: "label",  text: input.series ?? DEFAULT_LABELS[locale].screenerSeries, x: 28, y: 24, fontSize: 9, caps: true },
     { kind: "ticker", text: lead, x: 28, y: 48, fontSize: 34 },
     {
       kind: "peer-chips",
@@ -390,34 +406,44 @@ function buildScreenerContent(input: CoverInput): ContentElement[] {
   ];
 }
 
-function buildThesisContent(input: CoverInput): ContentElement[] {
-  // Caller passes today's delta via input.series or an extended input.
-  // `anchor` holds the date stamp; `kind` here is repurposed as the delta body.
+function buildThesisContent(input: CoverInput, locale: Locale): ContentElement[] {
+  const labels = DEFAULT_LABELS[locale];
+  const anchor = (input.anchor ?? labels.thesisAnchorTBD).toUpperCase();
+  const cjk    = isCJKLocale(locale);
+  // CJK doesn't use ALL CAPS visually — keep label readable in mixed script.
+  const label  = cjk
+    ? `${labels.thesisLabelPrefix} · ${anchor}`
+    : `${labels.thesisLabelPrefix} · ${anchor}`.toUpperCase();
   return [
-    { kind: "label",  text: `TODAY'S DELTA · ${(input.anchor ?? "TBD").toUpperCase()}`, x: 28, y: 24, fontSize: 9, caps: true },
+    { kind: "label",  text: label, x: 28, y: 24, fontSize: 9, caps: !cjk },
     {
       kind: "delta",
-      text: splitDelta(input.kind ?? ""),
-      category: input.category ?? "AMBIGUOUS",
-      x: 28, y: 72,              // body cap-top (was conceptually y=44 = stack base; now explicit body y)
+      text: splitDelta(input.kind ?? "", locale),
+      category: (input.series as any) ?? "AMBIGUOUS",
+      x: 28, y: 72,
       fontSize: 18,
-      lineHeight: 22,            // tspan dy for line 2 — keep tight, don't push delta past safe-zone bottom
+      lineHeight: 22,
       categoryX: 28,
-      categoryY: 60,             // badge y (was 54 — moved down 6 to sit closer to delta body, gap reduced 18→12)
+      categoryY: 60,
       categoryFontSize: 10,
       categoryDotSize: 4,
     },
-    // Delta body rendered via content composition in figma-apply.ts
   ];
 }
 
 /**
  * Insert `\n` at the natural semantic break in a thesis delta string.
- * First-match priority: vs > · > — > : > sign-boundary > mid-space fallback (>25 chars).
- * Returns input unchanged if nothing matches. See SKILL.md §thesis for details.
+ * Universal priority: vs > · > — > : > sign-boundary > mid-space fallback.
+ * Locale extras (CJK adds 、，：； etc.) inserted between the universal
+ * separators and the mid-space fallback.
+ *
+ * Threshold for the mid-space fallback scales with locale char width:
+ * Latin ~0.55× fontSize → ~25 chars before risk; CJK ~1.0× fontSize →
+ * ~14 chars. Returns input unchanged if no priority matches and the
+ * string is below the locale-specific overflow risk.
  */
-export function splitDelta(text: string): string {
-  if (!text || text.includes("\n")) return text; // already split or empty
+export function splitDelta(text: string, locale: Locale = DEFAULT_LOCALE): string {
+  if (!text || text.includes("\n")) return text;
 
   // Priority 1: " vs "
   const vsIdx = text.search(/\s+vs\s+/i);
@@ -452,25 +478,36 @@ export function splitDelta(text: string): string {
     return text.slice(0, signIdx) + "\n" + text.slice(signIdx + 1);
   }
 
-  // Priority 6 (fallback): split at the whitespace closest to the middle,
-  // but only when the string is long enough that single-line rendering
-  // would overflow. Catches editorial copy with no priority hook (e.g.
-  // "Late long-term debt cycle revisits 1980" — no vs / dot / dash).
-  if (text.length > 25) {
+  // Priority 6: locale-specific separators (e.g. 、，：； for CJK).
+  // First match in declaration order wins; break AFTER the separator.
+  for (const sep of LOCALE_SEPARATORS[locale]) {
+    const idx = text.indexOf(sep);
+    if (idx > 0 && idx < text.length - sep.length) {
+      return text.slice(0, idx + sep.length) + "\n" + text.slice(idx + sep.length).replace(/^\s+/, "");
+    }
+  }
+
+  // Priority 7 (fallback): split when single-line rendering risks overflow.
+  // Threshold = max chars at fontSize 18 within the 264-px safe zone for this locale.
+  // Latin ≈ 25, CJK ≈ 14.
+  const overflowThreshold = maxCharsForWidth(264, 18, locale);
+  if (text.length > overflowThreshold) {
     const mid = Math.floor(text.length / 2);
+    // Prefer space; fall back to any character boundary for CJK (no mandatory whitespace).
     let bestIdx = -1;
     let bestDist = Infinity;
     for (let i = 0; i < text.length; i++) {
-      if (text[i] === " ") {
-        const dist = Math.abs(i - mid);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIdx = i;
-        }
+      const isBreak = text[i] === " " || (isCJKLocale(locale) && i > 0);
+      if (!isBreak) continue;
+      const dist = Math.abs(i - mid);
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = i;
       }
     }
     if (bestIdx > 0) {
-      return text.slice(0, bestIdx) + "\n" + text.slice(bestIdx + 1);
+      const skip = text[bestIdx] === " " ? 1 : 0;
+      return text.slice(0, bestIdx) + "\n" + text.slice(bestIdx + skip);
     }
   }
 
@@ -478,46 +515,24 @@ export function splitDelta(text: string): string {
   return text;
 }
 
-function buildWhatIfContent(input: CoverInput, bgHsl: HSL): ContentElement[] {
-  // Bars zone: x=[184,292] width 108, baseline y=120, max ≈28px tall.
-  const values = input.whatIfBars ?? [];
+function buildWhatIfContent(input: CoverInput, bgHsl: HSL, locale: Locale): ContentElement[] {
   const bars: BarSpec[] = [];
-  let zeroLineY = 120;
-  if (values.length > 0) {
-    const N = values.length;
-    const X0 = 184, X1 = 292, BASELINE = 120;
-    const w = (X1 - X0 - 3 * (N - 1)) / N;
-    const maxAbs = Math.max(...values.map(v => Math.abs(v)), 0.0001);
-    const scale = 28 / maxAbs;
-    const heights = values.map(v => Math.max(Math.abs(v) * scale, 4));
-    const maxNegH = values.reduce(
-      (acc, v, i) => v < 0 ? Math.max(acc, heights[i]!) : acc, 0,
-    );
-    zeroLineY = BASELINE - maxNegH;
-    values.forEach((v, i) => {
-      const isPositive = v >= 0;
-      const h = heights[i]!;
-      const x = X0 + i * (w + 3);
-      const y = isPositive ? zeroLineY - h : zeroLineY;
-      bars.push({
-        x, y, width: w, height: h,
-        color: barColorFor(bgHsl.H, isPositive),
-        isPositive,
-      });
-    });
-  }
+  const labels = DEFAULT_LABELS[locale];
+  const cjk    = isCJKLocale(locale);
   return [
-    { kind: "label",    text: input.series ?? "", x: 28, y: 20, fontSize: 9, caps: true },
-    { kind: "verb",     text: input.kind ?? "", x: 28, y: 64, fontSize: 9 },        // re-uses caps-small style; authored uppercase
+    { kind: "label",    text: input.series ?? labels.whatIfLabel, x: 28, y: 20, fontSize: 9, caps: !cjk },
+    { kind: "verb",     text: input.kind   ?? "", x: 28, y: 64, fontSize: 9, caps: !cjk } as any,
     { kind: "hero-pct", text: input.anchor ?? "", x: 28, y: 80, fontSize: 40 },
-    { kind: "bars",     bars, zeroLineY },
+    { kind: "bars",     bars, zeroLineY: 112 },
   ];
 }
 
-function buildGeneralContent(input: CoverInput): ContentElement[] {
+function buildGeneralContent(input: CoverInput, locale: Locale): ContentElement[] {
+  const labels = DEFAULT_LABELS[locale];
+  const cjk    = isCJKLocale(locale);
   return [
-    { kind: "label",      text: input.kind ?? "", x: 28, y: 24, fontSize: 9, caps: true },
-    { kind: "hero-pulse", text: input.anchor ?? "", x: 28, y: 66, fontSize: 28 },   // bottom-grouped with series
+    { kind: "label",      text: input.kind   ?? labels.generalKind, x: 28, y: 24, fontSize: 9, caps: !cjk },
+    { kind: "hero-pulse", text: input.anchor ?? "", x: 28, y: 66, fontSize: 28 },
     { kind: "series",     text: input.series ?? "", x: 28, y: 106 },
   ];
 }

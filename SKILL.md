@@ -460,6 +460,49 @@ Full walkthrough: `references/image-pipeline.md`.
 
 ---
 
+## Multi-language support (i18n)
+
+`CoverInput.locale` is optional (defaults to `"en"`). Supported:
+`en` / `zh-CN` / `zh-TW` / `ja-JP` / `ko-KR`. Adding a new locale = append entries to the four tables in `src/i18n.ts`.
+
+**What the skill localizes:**
+
+| Layer | Behavior |
+| --- | --- |
+| Default labels (when input.series / kind missing) | Translated per `DEFAULT_LABELS[locale]` — e.g. `"TODAY'S DELTA"` → `"今日变化"` |
+| Category labels | Canonical keys (`RISK / CATALYST / AMBIGUOUS`) accepted on input; output renders the locale's display string via `localizeCategory()` |
+| `caps: true` flag | Auto-disabled for CJK locales (no uppercase in CJK; the small-caps tracking style doesn't apply) |
+| `splitDelta` separators | CJK locales add `，、：；` to the priority list after the universal `vs / · / — / : / sign-boundary`. Threshold scales by char width — Latin ~25 chars, CJK ~14 chars before overflow risk |
+| Font stack | Output `fonts.cover` and `fonts.metadata` carry primary face + locale-specific fallback chain (e.g. `["Delight", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", …]`) |
+| Output metadata | `output.locale` + `output.direction` (`ltr` / future `rtl`) so renderers can apply correct styling without re-detecting |
+
+**What the skill does NOT localize:**
+
+- User-supplied content (`title`, `subtitle`, `author`, `tickers`, `kind`, `anchor`, `series`) — caller passes already-localized text. The skill renders what's given.
+- Brand logos and ticker symbols — these are language-neutral.
+- Anti-pattern rules and validation messages — stay in English (dev-facing).
+
+**Renderer wiring:**
+
+```jsx
+const cover = generateCover({ ...playbook, locale: "zh-CN" });
+
+// Apply font stack — single CSS string covers Latin + CJK fallback
+<style>{`
+  .cover-text { font-family: ${fontStackToCss(cover.fonts.cover)}; }
+  .meta-text  { font-family: ${fontStackToCss(cover.fonts.metadata)}; }
+`}</style>
+
+<div lang={cover.locale} dir={cover.direction}>
+  <CoverSvg output={cover} />
+  <h3 style={{ ...cover.meta.title.style }}>{playbook.title}</h3>
+</div>
+```
+
+`fontStackToCss(stack)` is exported from `src/i18n.ts`.
+
+---
+
 ## Three-way sync discipline
 
 Every rule change must land in ALL of:
