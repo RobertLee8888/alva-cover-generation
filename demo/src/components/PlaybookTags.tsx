@@ -4,6 +4,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { Template } from '@skill/types';
 import { BRAND_REGISTRY } from '@skill/brand-registry';
+import { BRAND_LOGO_SLUG } from './skill-gaps';
 import { BrandLogoMark } from './BrandLogoMark';
 
 export type Tag =
@@ -108,18 +109,22 @@ function TagPill({ tag }: { tag: Tag }) {
     );
   }
   const brand = BRAND_REGISTRY[tag.label];
+  const slugInfo = BRAND_LOGO_SLUG[tag.label];
+  // Only show a logo when we actually have a CDN slug. Without a slug,
+  // simpleicons would 404 → wrong-icon fallback. Better to show no logo.
+  const showLogo = brand && slugInfo;
   return (
     <div style={{
       display: 'flex', alignItems: 'center',
-      gap: brand ? 4 : 0,
+      gap: showLogo ? 4 : 0,
       padding: '2px 8px', borderRadius: 4,
       background: SUBJECT_STYLE.bg, flexShrink: 0,
     }}>
-      {brand && (
+      {showLogo && (
         <BrandLogoMark
-          slug={tag.label.toLowerCase()}
+          slug={slugInfo.logoSlug}
           color={typeof brand.color === 'string' ? brand.color : '#000'}
-          fallbackSymbol="memory"
+          fallbackSymbol={slugInfo.fallbackSymbol}
           size={10}
         />
       )}

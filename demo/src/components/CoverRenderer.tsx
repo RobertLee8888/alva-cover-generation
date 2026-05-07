@@ -1,17 +1,25 @@
-// Pure SVG renderer for the SKILL's CoverOutput. Every visible glyph and
-// shape comes from data the SKILL produced — no hardcoded layout here.
-// To change cover behavior, edit src/cover-gen.ts (NOT this file).
+// Renders the SKILL's CoverOutput as SVG.
+//
+// CONSTRAINT: every visible value (color, opacity, position, font size, ...)
+// must come from the SKILL output OR from `skill-gaps.ts` — which is a
+// transitional file that lists values the SKILL should expose but doesn't yet.
+// No constants live in this file.
+//
+// To change cover behavior: edit src/cover-gen.ts (or, where the gap requires
+// it, the corresponding entry in skill-gaps.ts AND open a SKILL gap to
+// migrate it). Never edit this file with new values.
 
 import { useMemo } from 'react';
-import type { CoverInput, CoverOutput, ContentElement, RGB } from '@skill/types';
+import type { CoverInput, CoverOutput, ContentElement, RGB, TextPalette } from '@skill/types';
 import { generateCover } from '@skill/cover-gen';
 import { materialSymbolUrl } from '@skill/icon-mapping';
 import { rgbToCss } from './color-utils';
 import { BrandLogo } from './BrandLogo';
-
-const COVER_W = 320;
-const COVER_H = 140;
-const FONT = 'Inter, system-ui, sans-serif';
+import {
+  COVER_W, COVER_H, FONT_FAMILY,
+  CATEGORY_COLORS, TYPOGRAPHY, CHIP_STYLE, BARS_STYLE,
+  BRAND_LOGO_SLUG,
+} from './skill-gaps';
 
 export function CoverRenderer({ input }: { input: CoverInput }) {
   const cover: CoverOutput = useMemo(() => generateCover(input), [input]);
@@ -54,8 +62,8 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
               width: '100%', height: '100%',
               backgroundColor: rgbToCss(icon.color),
               opacity: icon.opacity,
-              WebkitMaskImage: `url(${materialUrl(icon.symbol)})`,
-              maskImage: `url(${materialUrl(icon.symbol)})`,
+              WebkitMaskImage: `url(${materialSymbolUrl(icon.symbol)})`,
+              maskImage: `url(${materialSymbolUrl(icon.symbol)})`,
               WebkitMaskSize: 'contain', maskSize: 'contain',
               WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
               WebkitMaskPosition: 'center', maskPosition: 'center',
@@ -66,11 +74,11 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
 
       {icon?.kind === 'brand' && (
         <BrandLogo
-          slug={icon.ticker.toLowerCase()}
+          slug={BRAND_LOGO_SLUG[icon.ticker]?.logoSlug ?? icon.ticker.toLowerCase()}
           color={rgbToCssHex(icon.color)}
           size={icon.size} opacity={icon.opacity}
           x={icon.x} y={icon.y}
-          fallbackSymbol="memory"
+          fallbackSymbol={BRAND_LOGO_SLUG[icon.ticker]?.fallbackSymbol ?? 'memory'}
         />
       )}
 
@@ -81,55 +89,106 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
   );
 }
 
-function ContentEl({ el, text }: { el: ContentElement; text: { base: RGB; hero: RGB; support: RGB; label: RGB } }) {
-  const baseCss = rgbToCss(text.base);
-  const heroCss = rgbToCss(text.hero);
+function paletteColor(text: TextPalette, role: keyof TextPalette): string {
+  return rgbToCss(text[role]);
+}
 
+function ContentEl({ el, text }: { el: ContentElement; text: TextPalette }) {
   switch (el.kind) {
-    case 'label':
+    case 'label': {
+      const t = TYPOGRAPHY.caps;
       return (
         <text
           x={el.x} y={el.y}
-          fill={baseCss} fillOpacity={0.55}
-          fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
-          letterSpacing="0.16em" dominantBaseline="hanging"
+          fill={paletteColor(text, t.paletteRole)}
+          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
+          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
         >
           {el.text.toUpperCase()}
         </text>
       );
+    }
 
-    case 'ticker':
+    case 'verb': {
+      const t = TYPOGRAPHY.caps;
       return (
         <text
           x={el.x} y={el.y}
-          fill={baseCss} fillOpacity={0.92}
-          fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
-          dominantBaseline="hanging"
+          fill={paletteColor(text, t.paletteRole)}
+          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
+          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+        >
+          {el.text.toUpperCase()}
+        </text>
+      );
+    }
+
+    case 'series': {
+      const t = TYPOGRAPHY.caps;
+      return (
+        <text
+          x={el.x} y={el.y}
+          fill={paletteColor(text, t.paletteRole)}
+          fontFamily={FONT_FAMILY} fontSize={9} fontWeight={t.fontWeight}
+          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+        >
+          {el.text.toUpperCase()}
+        </text>
+      );
+    }
+
+    case 'ticker':
+    case 'hero-pulse': {
+      const t = TYPOGRAPHY.hero;
+      return (
+        <text
+          x={el.x} y={el.y}
+          fill={paletteColor(text, t.paletteRole)}
+          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
+          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
         >
           {el.text}
         </text>
       );
+    }
+
+    case 'hero-pct': {
+      const t = TYPOGRAPHY.heroPct;
+      return (
+        <text
+          x={el.x} y={el.y}
+          fill={paletteColor(text, t.paletteRole)}
+          fontFamily={FONT_FAMILY} fontSize={el.fontSize} fontWeight={t.fontWeight}
+          letterSpacing={t.letterSpacing} dominantBaseline="hanging"
+        >
+          {el.text}
+        </text>
+      );
+    }
 
     case 'peer-chips': {
+      const t = TYPOGRAPHY.chipText;
+      const bgRgba = rgbToCss(text[CHIP_STYLE.bgRole], CHIP_STYLE.bgOpacity);
+      const fg = paletteColor(text, t.paletteRole);
       let cursor = el.x;
-      const chips = el.tickers.map((t, i) => {
-        const w = el.chipPaddingX * 2 + t.length * (el.chipFontSize * 0.62);
+      const chips = el.tickers.map((tk, i) => {
+        const w = el.chipPaddingX * 2 + tk.length * (el.chipFontSize * 0.62);
         const chip = (
           <g key={i}>
             <rect
               x={cursor} y={el.y - 1}
               width={w} height={el.chipHeight}
               rx={el.chipBorderRadius}
-              fill={baseCss} fillOpacity={0.10}
+              fill={bgRgba}
             />
             <text
               x={cursor + w / 2} y={el.textBaselineY}
-              fill={baseCss} fillOpacity={0.72}
-              fontFamily={FONT} fontSize={el.chipFontSize} fontWeight={600}
-              letterSpacing="0.10em"
+              fill={fg}
+              fontFamily={FONT_FAMILY} fontSize={el.chipFontSize}
+              fontWeight={t.fontWeight} letterSpacing={t.letterSpacing}
               textAnchor="middle" dominantBaseline="middle"
             >
-              {t}
+              {tk}
             </text>
           </g>
         );
@@ -140,9 +199,10 @@ function ContentEl({ el, text }: { el: ContentElement; text: { base: RGB; hero: 
     }
 
     case 'delta': {
-      const cat = el.category;
-      const catColor = cat === 'RISK' ? '#C0392B' : cat === 'CATALYST' ? '#1F8754' : '#9A7B2E';
+      const t = TYPOGRAPHY.hero;
+      const catColor = CATEGORY_COLORS[el.category];
       const lines = el.text.split('\n');
+      const bodyColor = paletteColor(text, t.paletteRole);
       return (
         <>
           <g>
@@ -150,18 +210,20 @@ function ContentEl({ el, text }: { el: ContentElement; text: { base: RGB; hero: 
             <text
               x={el.categoryX + 10} y={el.categoryY}
               fill={catColor}
-              fontFamily={FONT} fontSize={el.categoryFontSize} fontWeight={600}
-              letterSpacing="0.16em" dominantBaseline="middle"
+              fontFamily={FONT_FAMILY} fontSize={el.categoryFontSize}
+              fontWeight={t.fontWeight} letterSpacing={TYPOGRAPHY.caps.letterSpacing}
+              dominantBaseline="middle"
             >
-              {cat}
+              {el.category}
             </text>
           </g>
           {lines.map((line, i) => (
             <text
               key={i}
               x={el.x} y={el.y + i * el.lineHeight}
-              fill={baseCss} fillOpacity={0.92}
-              fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
+              fill={bodyColor}
+              fontFamily={FONT_FAMILY} fontSize={el.fontSize}
+              fontWeight={t.fontWeight} letterSpacing={t.letterSpacing}
               dominantBaseline="hanging"
             >
               {line}
@@ -171,85 +233,38 @@ function ContentEl({ el, text }: { el: ContentElement; text: { base: RGB; hero: 
       );
     }
 
-    case 'verb':
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={baseCss} fillOpacity={0.55}
-          fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
-          letterSpacing="0.16em" dominantBaseline="hanging"
-        >
-          {el.text.toUpperCase()}
-        </text>
-      );
-
-    case 'hero-pct':
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={heroCss}
-          fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
-          letterSpacing="-0.02em" dominantBaseline="hanging"
-        >
-          {el.text}
-        </text>
-      );
-
-    case 'hero-pulse':
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={baseCss} fillOpacity={0.92}
-          fontFamily={FONT} fontSize={el.fontSize} fontWeight={600}
-          dominantBaseline="hanging"
-        >
-          {el.text}
-        </text>
-      );
-
-    case 'series':
-      return (
-        <text
-          x={el.x} y={el.y}
-          fill={baseCss} fillOpacity={0.55}
-          fontFamily={FONT} fontSize={9} fontWeight={600}
-          letterSpacing="0.16em" dominantBaseline="hanging"
-        >
-          {el.text.toUpperCase()}
-        </text>
-      );
-
-    case 'bars':
+    case 'bars': {
+      const lineColor = rgbToCss(text[BARS_STYLE.zeroLineColor], BARS_STYLE.zeroLineOpacity);
       return (
         <>
           {el.bars.length > 0 && (
             <line
-              x1={184} x2={292} y1={el.zeroLineY} y2={el.zeroLineY}
-              stroke={baseCss} strokeOpacity={0.15} strokeWidth={0.5}
+              x1={BARS_STYLE.zoneX1} x2={BARS_STYLE.zoneX2}
+              y1={el.zeroLineY} y2={el.zeroLineY}
+              stroke={lineColor} strokeWidth={BARS_STYLE.zeroLineStroke}
             />
           )}
           {el.bars.map((b, i) => (
             <rect
               key={i}
               x={b.x} y={b.y} width={b.width} height={b.height}
-              fill={rgbToCss(b.color)} fillOpacity={0.55} rx={1}
+              fill={rgbToCss(b.color, BARS_STYLE.barOpacity)} rx={1}
             />
           ))}
         </>
       );
+    }
 
     case 'chip':
     case 'delta-badge':
     case 'delta-stack':
-      return null; // not currently emitted by the SKILL for our inputs
+      // The SKILL's current cover-gen.ts doesn't emit these for our inputs.
+      // If/when it does, render here.
+      return null;
 
     default:
       return null;
   }
-}
-
-function materialUrl(name: string): string {
-  return materialSymbolUrl(name);
 }
 
 function rgbToCssHex({ r, g, b }: RGB): string {

@@ -6,6 +6,7 @@ import { useState, useMemo } from 'react';
 import { CoverRenderer } from './CoverRenderer';
 import { PlaybookTags, buildTags } from './PlaybookTags';
 import { Avatar } from './Avatar';
+import { CdnIcon } from './CdnIcon';
 import { generateCover } from '@skill/cover-gen';
 import { hslToRgb } from '@skill/color';
 import { rgbToCss } from './color-utils';
@@ -94,8 +95,8 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
             display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
             color: 'rgba(0,0,0,0.9)',
           }}>
-            <Stat icon="star" value={p.stars} />
-            <Stat icon="remix" value={p.remixes} />
+            <Stat icon="star-l" value={p.stars} />
+            <Stat icon="remix-l" value={p.remixes} />
           </div>
         </div>
       </div>
@@ -103,36 +104,14 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
   );
 }
 
-function Stat({ icon, value }: { icon: 'star' | 'remix'; value: number }) {
+function Stat({ icon, value }: { icon: 'star-l' | 'remix-l'; value: number }) {
   return (
     <span style={{
       display: 'flex', alignItems: 'center', gap: 4,
       fontSize: 14, lineHeight: '22px', letterSpacing: '0.14px',
     }}>
-      {icon === 'star' ? <StarIcon /> : <RemixIcon />}
+      <CdnIcon name={icon} size={16} />
       {value}
     </span>
-  );
-}
-
-function StarIcon() {
-  return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-
-function RemixIcon() {
-  // Branching remix arrows
-  return (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h6l8 12h4" />
-      <path d="M3 18h6l3-4.5" />
-      <polyline points="17 3 21 6 17 9" />
-      <polyline points="17 15 21 18 17 21" />
-    </svg>
   );
 }
