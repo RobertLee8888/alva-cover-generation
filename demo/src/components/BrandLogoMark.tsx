@@ -2,13 +2,13 @@
 // as <BrandLogo> but smaller and inline (not inside <foreignObject>).
 
 import { useEffect, useRef, useState } from 'react';
+import { materialSymbolUrl } from '@skill/icon-mapping';
 
 const JSDELIVR = (slug: string) =>
   `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${slug}.svg`;
 const SIMPLEICONS_BLACK = (slug: string) =>
   `https://cdn.simpleicons.org/${slug}/000000`;
-const MATERIAL = (name: string) =>
-  `https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/${name}/default/24px.svg`;
+const MATERIAL = (name: string) => materialSymbolUrl(name);
 
 export function BrandLogoMark({
   slug, color, fallbackSymbol, size = 10,

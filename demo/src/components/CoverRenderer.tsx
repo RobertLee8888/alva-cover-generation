@@ -5,6 +5,7 @@
 import { useMemo } from 'react';
 import type { CoverInput, CoverOutput, ContentElement, RGB } from '@skill/types';
 import { generateCover } from '@skill/cover-gen';
+import { materialSymbolUrl } from '@skill/icon-mapping';
 import { rgbToCss } from './color-utils';
 import { BrandLogo } from './BrandLogo';
 
@@ -248,9 +249,7 @@ function ContentEl({ el, text }: { el: ContentElement; text: { base: RGB; hero: 
 }
 
 function materialUrl(name: string): string {
-  // Google Material Symbols static SVG endpoint — same one src/icon-mapping.ts
-  // returns. Inlined here so the renderer doesn't need a build step on the URL.
-  return `https://fonts.gstatic.com/s/i/short-term/release/materialsymbolsoutlined/${name}/default/24px.svg`;
+  return materialSymbolUrl(name);
 }
 
 function rgbToCssHex({ r, g, b }: RGB): string {
