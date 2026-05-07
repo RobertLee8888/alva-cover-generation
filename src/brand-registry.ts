@@ -78,11 +78,10 @@ export const BRAND_REGISTRY: BrandRegistry = {
   DOT:   { color: "#E6007A", logoSvg: "DOT.svg",   mono: false, source: "https://simpleicons.org/?q=polkadot",  lastVerified: "2026-04-23" },
   UNI:   { color: "#FF007A", logoSvg: "UNI.svg",   mono: false, source: "https://simpleicons.org/?q=uniswap",   lastVerified: "2026-04-23" },
 
-  // ---------- ETFs — distinct branding only ----------
-  SPY:   { color: "#000000", logoSvg: "SPY.svg",   mono: true,  source: "https://en.wikipedia.org/wiki/SPDR_S%26P_500_ETF_Trust", lastVerified: "2026-04-23" },
-  QQQ:   { color: "#00B0B9", logoSvg: "QQQ.svg",   mono: false, source: "https://en.wikipedia.org/wiki/Invesco_QQQ", lastVerified: "2026-04-23" },
-  VOO:   { color: "#96151D", logoSvg: "VOO.svg",   mono: false, source: "https://en.wikipedia.org/wiki/Vanguard_S%26P_500_ETF", lastVerified: "2026-04-23" },
-  VTI:   { color: "#96151D", logoSvg: "VTI.svg",   mono: false, source: "https://en.wikipedia.org/wiki/Vanguard_Total_Stock_Market_Index_Fund", lastVerified: "2026-04-23" },
-  IWM:   { color: "#000000", logoSvg: "IWM.svg",   mono: true,  source: "https://en.wikipedia.org/wiki/iShares", lastVerified: "2026-04-23" },
-  ARKK:  { color: "#000000", logoSvg: "ARKK.svg",  mono: true,  source: "https://en.wikipedia.org/wiki/Ark_Invest", lastVerified: "2026-04-23" },
+  // ETFs intentionally excluded from this registry. SPY / QQQ / VOO / VTI /
+  // IWM / ARKK are index-tracking ETFs without real brand logos on the
+  // SimpleIcons CDN, so a brand-path render falls back to a generic icon
+  // that misrepresents the card. They route through the material-icon path
+  // via their card's `domain` (e.g. macro → globe), which renders correctly
+  // as a soft, bg-tinted watermark.
 };
