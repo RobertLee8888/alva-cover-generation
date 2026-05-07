@@ -6,12 +6,11 @@
 
 import { useMemo } from 'react';
 import type {
-  CoverInput, CoverOutput, ContentElement, RGB, TextPalette, FontStack, Locale,
+  CoverInput, CoverOutput, ContentElement, RGB, TextPalette, FontStack,
 } from '@skill/types';
 import { generateCover } from '@skill/cover-gen';
 import { materialSymbolUrl } from '@skill/icon-mapping';
 import { COVER_W, COVER_H } from '@skill/dimensions';
-import { localizeCategory } from '@skill/i18n';
 import { rgbToCss } from './color-utils';
 import { BrandLogo } from './BrandLogo';
 
@@ -78,7 +77,7 @@ export function CoverRenderer({ input }: { input: CoverInput }) {
       )}
 
       {content.map((el, i) => (
-        <ContentEl key={i} el={el} text={text} fontFamily={fontFamily} locale={cover.locale} />
+        <ContentEl key={i} el={el} text={text} fontFamily={fontFamily} />
       ))}
     </svg>
   );
@@ -90,8 +89,8 @@ function stackToCss(stack: FontStack): string {
 }
 
 function ContentEl({
-  el, text, fontFamily, locale,
-}: { el: ContentElement; text: TextPalette; fontFamily: string; locale: Locale }) {
+  el, text, fontFamily,
+}: { el: ContentElement; text: TextPalette; fontFamily: string }) {
   switch (el.kind) {
     case 'label':
     case 'verb': {
@@ -186,7 +185,7 @@ function ContentEl({
               letterSpacing={`${el.categoryLetterSpacing}em`}
               dominantBaseline="middle"
             >
-              {localizeCategory(el.category, locale)}
+              {el.categoryLabel}
             </text>
           </g>
           {lines.map((line, i) => (
