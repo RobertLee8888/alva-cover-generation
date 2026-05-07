@@ -11,7 +11,11 @@ import {
 import {
   DEFAULT_ICON_GEOM, WHATIF_ICON_GEOM,
   BARS_LEFT, BARS_RIGHT,
+  CATEGORY_COLORS, FONT_WEIGHTS, TRACKED_CAPS,
 } from "./dimensions";
+
+// Re-export so existing consumers keep working (the canonical home is now ./dimensions).
+export { CATEGORY_COLORS, FONT_WEIGHTS, TRACKED_CAPS } from "./dimensions";
 import {
   fnv1a, hslToRgb, hexToRgb, clampPaperRegime,
   textBaseFor, deriveTextPalette, alphaOnWhite,
@@ -309,28 +313,6 @@ function buildBrandIcon(ticker: string, brand: BrandEntry, template: Template): 
 // ================================================================
 // validatePortrait — intake-time guard for portrait covers
 // ================================================================
-
-// ================================================================
-// Semantic colors + typography presets (B1, B2)
-// ================================================================
-
-/** Resolved RGB for the thesis category-badge dot. Locale-independent. */
-export const CATEGORY_COLORS: Record<"RISK" | "CATALYST" | "AMBIGUOUS", RGB> = {
-  RISK:      { r: 0.86, g: 0.15, b: 0.15 },   // ~#DC2626
-  CATALYST:  { r: 0.09, g: 0.64, b: 0.29 },   // ~#16A34A
-  AMBIGUOUS: { r: 0.85, g: 0.47, b: 0.02 },   // ~#D97706
-};
-
-/** Inter / Delight font weights used across the cover. */
-export const FONT_WEIGHTS = {
-  regular:   400,
-  medium:    500,
-  semiBold:  600,
-  bold:      700,
-} as const;
-
-/** Em-units letter-spacing for tracked caps small. 0 elsewhere. */
-export const TRACKED_CAPS = 0.16;
 
 // ================================================================
 // validatePortrait — intake-time guard for portrait covers

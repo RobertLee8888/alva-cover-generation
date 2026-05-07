@@ -56,3 +56,35 @@ export const TYPE_FLOORS = {
 
 export const DEFAULT_ICON_GEOM = { x: 192, y: 22, size: 100 } as const;
 export const WHATIF_ICON_GEOM  = { x: 240, y: 12, size: 64  } as const;
+
+// ---------- Theme tokens (canonical exports) ----------
+//
+// All non-locale-dependent design tokens live here so renderer code has
+// one obvious import path. Locale-dependent font stacks remain in i18n.ts
+// (use `getCoverFontStack(locale)` + `fontStackToCss()` when locale matters).
+
+import type { RGB } from "./types";
+
+/** Default cover font-family CSS string (used when locale is unknown / Latin-only). */
+export const FONT_FAMILY_COVER    = '"Delight", -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif';
+
+/** Default metadata-frame font-family CSS string. */
+export const FONT_FAMILY_METADATA = '"Inter", -apple-system, system-ui, "Segoe UI", Helvetica, Arial, sans-serif';
+
+/** Inter / Delight weights used across covers + metadata. */
+export const FONT_WEIGHTS = {
+  regular:  400,
+  medium:   500,
+  semiBold: 600,
+  bold:     700,
+} as const;
+
+/** Em-units letter-spacing for tracked caps small. 0 elsewhere. */
+export const TRACKED_CAPS = 0.16;
+
+/** Resolved RGB for the thesis category-badge dot. Locale-independent. */
+export const CATEGORY_COLORS: Record<"RISK" | "CATALYST" | "AMBIGUOUS", RGB> = {
+  RISK:      { r: 0.86, g: 0.15, b: 0.15 },   // ~#DC2626
+  CATALYST:  { r: 0.09, g: 0.64, b: 0.29 },   // ~#16A34A
+  AMBIGUOUS: { r: 0.85, g: 0.47, b: 0.02 },   // ~#D97706
+};
