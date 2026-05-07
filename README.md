@@ -1,90 +1,190 @@
 # alva-cover-generation
 
-Production-ready skill for generating Alva Explore playbook covers.
-
-## What this is
-
-A self-contained skill package that generates deterministic, brand-coherent
-cover designs for Alva's Explore grid. Handles the full pipeline:
-
-- **Input** → `{ template, title, author, tickers, domain?, portrait? }`
-- **Output** → a complete `CoverOutput` (bg gradient, icon spec, text palette,
-  archetype content) ready to apply to Figma via the Plugin API, or render
-  to SVG/PNG via any other renderer.
-
-## Quick start
-
-Read `SKILL.md` end-to-end first. Then:
+Pure-function skill for generating every Playbook cover in Alva's Explore grid.
 
 ```ts
-import { generateCover, applyCoverToFigma } from "./src/cover-gen";
+import { generateCover } from "./src/cover-gen";
 
-const spec = generateCover({
+const cover = generateCover({
   template: "what-if",
   title:    "SPY & Oil After Hormuz Blockade",
   author:   "terrezzaeynon897",
   tickers:  ["SPY", "USO"],
 });
-
-// Inside a Figma plugin:
-await applyCoverToFigma(spec, {
-  card: figma.getNodeByIdAsync("3780:11877"),
-  input: { template, title, author, tickers },
-});
+// → bg gradient + icon spec + text palette + archetype content + metadata layout
 ```
 
-## Files in this skill
+One sync call, every rendering rule on the output. No image rebuild, no CDN invalidation, no production-side hardcoded styles. Renders 1:1 across SVG / Figma plugin / CSS / Canvas / Native via the same `CoverOutput` shape.
 
-- `SKILL.md` — entry point. Covers the full rule system: taxonomy, geometry,
-  color system, layer stack, anti-patterns, integration. Read this first.
-- `README.md` — this file.
-- `src/` — TypeScript implementation, runnable out of the box.
-- `references/` — detailed sub-specs (palette, registry, icons, image pipe,
-  anti-patterns, iteration log).
-- `examples/` — 12 worked samples.
+---
 
-## Integrating into Alva's production system
+## Why it's worth using
 
-1. **Import the pure functions.** `src/cover-gen.ts` exports `generateCover()`
-   as a pure `(CoverInput) => CoverOutput` function with no side effects. Can
-   be used by any renderer: Figma plugin, server-side image gen, client-side
-   preview.
-2. **For Figma plugin use**, `src/figma-apply.ts` provides the Figma Plugin
-   API applicator. Requires 2024+ Plugin API.
-3. **For server-side rendering**, consume `CoverOutput` with any SVG/Canvas
-   library. The shape is deliberately renderer-agnostic.
-4. **Data tables** (`palette.ts`, `brand-registry.ts`, `icon-mapping.ts`)
-   are plain TypeScript modules — tree-shakeable and swappable.
+### Real-time, not pre-baked
 
-## Extending
+Covers compute in the browser at render time (<1 ms, pure function). 10k playbook scale: **~$1.50/month CSR vs ~$770/month pre-rendered + CDN**. Data refreshes flow through automatically — no rebuild, no cache invalidation, no stale images.
 
-- **Add a new brand** → append to `src/brand-registry.ts`; place logo SVG in
-  a shared assets folder; see `references/brand-registry.md` for sourcing.
-- **Add a new domain** → append to `src/icon-mapping.ts`; add domain to its
-  template's allowed-list; update the inference keyword dictionary.
-- **Add a new template** → define palette band, content skeleton, and icon
-  override in the appropriate src/ modules. Update `references/anti-patterns.md`
-  for template-specific anti-patterns.
-- **Tune a palette band** → edit `src/palette.ts`; run `scripts/palette-audit.ts`
-  to check for adjacent-hue collisions (TBD).
+### Single source of truth for the entire visual system
+
+Every value the renderer needs — bg formula, icon position, font sizes, wrap behavior, portrait crop, metadata title style — comes from `generateCover()`'s output. Production reads `output.bg.portraitRender.crop.svgPreserveAspectRatio`, `output.meta.title.style`, `output.content[i].x` and similar; **no rule duplicated in production code**. Skill upgrade → bundle redeploy → all existing covers re-render under new rules with zero hand-edits.
+
+### Renderer-agnostic, renderer-friendly
+
+Same `CoverOutput` consumes cleanly in five renderers:
+
+| Renderer | Reads | One-line wiring |
+| --- | --- | --- |
+| SVG `<image>` | `bg.portraitRender.crop.svgPreserveAspectRatio` | `preserveAspectRatio={...}` |
+| Figma plugin | `bg.portraitRender.crop.figmaImageTransform` + `meta.title.figma.maxLines` | direct property assignment |
+| CSS `background-image` | `bg.portraitRender.crop.cssBackgroundPosition` + `cssBackgroundSize` | inline style spread |
+| HTML `<h3>` (metadata title) | `meta.title.style` | `<h3 style={{ ...style }}>` |
+| Canvas | `content[i].x/y` + `tspanLines()` helper | manual fillText loop |
+
+### Robustness wired into the rules
+
+- **`validatePortrait()`** — intake guard rejects 5 silent-fail modes (vertical source, generic-persona subject, missing license, hue out of range, empty subject).
+- **`fetchWithRetry / fetchWithFallback`** — image fetcher with 3-attempt exponential backoff + cascade through alternate URLs (4xx terminal, 5xx retried).
+- **`PERSON_REGISTRY`** — curated Wikimedia-PD source URLs for named public figures; `subjectName` lookup overrides any stale `imageHash` so production data drift can't ship the wrong face.
+- **`splitDelta()`** — six-priority semantic break (`vs > · > — > : > sign-boundary > mid-space fallback`) prevents thesis delta from overflowing the cover on any editorial copy.
+- **`output.meta.title.style`** ships `WebkitLineClamp: 2` + `whiteSpace: 'normal'`, defeating any prior `nowrap` CSS in production for free.
+
+### Auditable history
+
+- **`SKILL.md`** — current spec, in declarative form. ~500 lines, ~21 KB.
+- **`references/anti-patterns.md`** — 14 named failure modes, each with rationale and fix.
+- **`references/iteration-log.md`** + **`skills-updates/SUMMARY.md`** — date-stamped changelog with the why-we-changed-it for every value tweak.
+
+Anyone asking "why is X = Y instead of Z" finds the answer in the log, not in someone's memory.
+
+### Lean
+
+| | Lines | Bytes |
+| --- | --- | --- |
+| SKILL.md | 503 | 21 KB |
+| src/ (10 modules) | 2,119 | 81 KB |
+| Production package (this repo) | 14 files | **148 KB** |
+
+Zero runtime dependencies (only `fetch`, which is global). TypeScript-strict-friendly. Tree-shakeable.
+
+---
+
+## Install + integrate
+
+```bash
+git clone https://github.com/alva-ai/alva-cover-generation.git
+# or wire as a workspace package, npm package, or symlinked dependency
+```
+
+The minimum production integration is **one import + one call + one read per render path**:
+
+```tsx
+import { generateCover } from "@alva/cover-skill";
+import { useMemo } from "react";
+
+function PlaybookCard({ playbook }) {
+  // 1. Generate — pure & cacheable
+  const cover = useMemo(() => generateCover(playbook), [
+    playbook.template, playbook.title,
+    playbook.tickers.join(","), playbook.kind,
+    playbook.anchor, playbook.series,
+    playbook.portrait?.subjectName,
+  ]);
+
+  // 2. Render — read from output, never hardcode
+  return (
+    <article>
+      <CoverSvg output={cover} />
+      <h3 style={{ ...cover.meta.title.style }}>{playbook.title}</h3>
+      <p  style={{ ...cover.meta.subtitle.style }}>{playbook.subtitle}</p>
+    </article>
+  );
+}
+```
+
+Full integration walkthrough — including data fetching layers, image-resource caching, and refresh edge cases — is in **`INTEGRATION_GUIDE.docx`** (alongside this README).
+
+---
+
+## Public API
+
+| Export | Type | Purpose |
+| --- | --- | --- |
+| `generateCover(input)` | function | Main entry. Pure, deterministic. Returns `CoverOutput`. |
+| `validatePortrait(input)` | function | Intake guard. Throws on orientation / scope / license / hue violations. |
+| `splitDelta(text)` | function | Insert `\n` at semantic break for thesis delta. |
+| `tspanLines(text, x, lh)` | function | Split content text on `\n` into `Array<{text, x, dy}>` for SVG `<tspan>`. |
+| `rgbCss(rgb, opacity?)` | function | `CoverOutput` RGB → `rgb()` / `rgba()` CSS string. |
+| `fetchWithRetry(url, policy?)` | function | Single URL with exp backoff, 4xx terminal. |
+| `fetchWithFallback(primary, fallbacks[])` | function | Primary + cascade. Returns `{ok, blob, url, fromFallback, attempts}`. |
+| `fetchBrandLogo(brand)` / `fetchPersonPortrait(person)` | function | Convenience wrappers. |
+| `lookupPerson(name)` | function | Case-insensitive `PERSON_REGISTRY` lookup. |
+| `applyCoverToFigma(cover, target)` | function | Figma Plugin API applicator. |
+| `tryLoadCoverFont()` | function | Returns true if Delight loadable; false → falls back to Inter. |
+| `PERSON_REGISTRY` / `BRAND_REGISTRY` | const | Curated data tables. |
+| `GENERIC_PERSONA_KEYWORDS` | const | Persona-rejection vocabulary. |
+| `METADATA_LAYOUT` / `TITLE_STYLE` / `SUBTITLE_STYLE` / `CHIP_STYLE` | const | Direct-import alternative to `output.meta.*`. |
+| `FIGMA_TITLE_LAYOUT` / `FIGMA_SUBTITLE_LAYOUT` | const | Figma TEXT-node settings. |
+
+`CoverOutput` shape and full `ContentElement` union: `src/types.ts`.
+
+---
+
+## Files
+
+```
+alva-cover-generation/
+├── README.md                 ← this file
+├── SKILL.md                  ← spec (501 lines, 21 KB)
+├── INTEGRATION_GUIDE.docx    ← frontend integration walkthrough
+├── package.json · tsconfig.json
+└── src/
+    ├── cover-gen.ts          ← generateCover, splitDelta, validatePortrait, GENERIC_PERSONA_KEYWORDS
+    ├── types.ts              ← CoverInput, CoverOutput, BgSpec, IconSpec, ContentElement, MetaTextRole, …
+    ├── color.ts              ← FNV-1a, HSL ↔ RGB, textBase, blendHue, alphaOnWhite, iconColorFor
+    ├── palette.ts            ← per-template HSL bands
+    ├── brand-registry.ts     ← ticker → brand color/logo/fallbacks (67 entries)
+    ├── person-registry.ts    ← named persons → Wikimedia URL + fallbacks
+    ├── icon-mapping.ts       ← domain → Material Symbol
+    ├── metadata-layout.ts    ← title / subtitle / chip / author layout constants
+    ├── image-fetcher.ts      ← fetchWithRetry, fetchWithFallback, fetchBrandLogo, fetchPersonPortrait
+    ├── svg-helpers.ts        ← tspanLines, rgbCss
+    └── figma-apply.ts        ← Figma Plugin API applicator
+```
+
+---
 
 ## Three-way sync discipline
 
-Every rule change must land in all three of:
+Every rule change must land in **all three** of:
 
-1. **SKILL** (this folder's SKILL.md + SUMMARY.md + references/)
-2. **Figma example cards** (re-render the rule on the sample deck)
-3. **In-canvas spec panel** (the `D · 设计规范` review panel)
+1. **SKILL** — `SKILL.md` + `references/*.md` + an entry in `skills-updates/.../SUMMARY.md` (changelog).
+2. **Figma example cards** — re-apply the rule to the 12 Direction D sample cards (proof the rule renders).
+3. **In-canvas spec panel** — `D · 设计规范` panel that designers see during review.
 
-Updating any two of three without the third creates silent drift. See
-`SKILL.md` §The three-way sync discipline for full rationale.
+Updating any two without the third = silent drift. Some rules cascade: `bg → text + icon + bar`; `portraitH → bg + textBase`; `card width → cover internals (type-scale)`. Walk the cascade before closing.
+
+---
+
+## Adding things
+
+| Adding | Where |
+| --- | --- |
+| A new brand | append to `src/brand-registry.ts`; logo SVG into shared assets; sourcing notes in `references/brand-registry.md` |
+| A new public figure portrait | append to `src/person-registry.ts` with Wikimedia `Special:FilePath` URL + fallbacks |
+| A new domain | append to `src/icon-mapping.ts`; add to template's allow-list; update inference keywords |
+| A new template | define palette band + content skeleton + icon override in the relevant `src/` files; add template-specific anti-patterns to `references/anti-patterns.md` |
+| A new generic-persona keyword | append to `GENERIC_PERSONA_KEYWORDS` in `src/cover-gen.ts` |
+
+---
 
 ## Versioning
 
-Current: **1.0.0** — 2026-04-24
+Current: **1.0.0** — 2026-04-28
 
-Change log: `references/iteration-log.md`.
+Changelog: `skills-updates/alva-cover-generation/SUMMARY.md` + `references/iteration-log.md`.
+
+---
 
 ## License
 
-Alva internal. For external questions contact legal@alva.xyz.
+Alva internal. External questions: legal@alva.xyz.
