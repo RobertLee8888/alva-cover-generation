@@ -62,10 +62,11 @@ export function App() {
       </nav>
 
       <section className="grid">
-        {filtered.map(p => (
+        {filtered.map((p, i) => (
           <PlaybookCard
             key={p.id + locale}
             p={{ ...p, cover: { ...p.cover, locale } }}
+            staggerMs={i * 250}
           />
         ))}
       </section>

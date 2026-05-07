@@ -7,12 +7,13 @@ import { CoverRenderer } from './CoverRenderer';
 import { PlaybookTags, buildTags } from './PlaybookTags';
 import { Avatar } from './Avatar';
 import { CdnIcon } from './CdnIcon';
+import { useLiveInput } from './useLiveInput';
 import { generateCover } from '@skill/cover-gen';
 import { hslToRgb } from '@skill/color';
 import { rgbToCss } from './color-utils';
 import type { ExplorePlaybook } from '../data/playbooks';
 
-export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
+export function PlaybookCard({ p, staggerMs = 0 }: { p: ExplorePlaybook; staggerMs?: number }) {
   const tags = buildTags({
     template: p.cover.template,
     domain: p.cover.domain,
@@ -21,7 +22,10 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
 
   const [hovered, setHovered] = useState(false);
 
-  const cover = useMemo(() => generateCover(p.cover), [p.cover]);
+  // Live perturbation: re-jitters numerical content every 10s.
+  // bg/icon stay stable (derived from title+tickers, not from jittered numbers).
+  const liveInput = useLiveInput(p.cover, staggerMs);
+  const cover = useMemo(() => generateCover(liveInput), [liveInput]);
   const shadowColor = useMemo(() => {
     const { H, S } = cover.bg.hsl;
     return rgbToCss(hslToRgb(H, Math.min(S + 0.10, 0.40), 0.30), 0.14);
@@ -61,7 +65,7 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
         borderRadius: 8,
         overflow: 'hidden',
       }}>
-        <CoverRenderer input={p.cover} />
+        <CoverRenderer input={liveInput} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '16px 16px 12px' }}>
