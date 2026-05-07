@@ -44,7 +44,7 @@ export function PlaybookCard({ p, staggerMs = 0 }: { p: ExplorePlaybook; stagger
       onMouseLeave={() => setHovered(false)}
       style={{
         cursor: 'pointer',
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden',
         background: '#fff',
         border: '0.5px solid rgba(0,0,0,0.3)',
@@ -62,7 +62,7 @@ export function PlaybookCard({ p, staggerMs = 0 }: { p: ExplorePlaybook; stagger
         margin: '4px 4px 0 4px',
         width: 'calc(100% - 8px)',
         aspectRatio: '320 / 140',
-        borderRadius: 8,
+        borderRadius: 4,
         overflow: 'hidden',
       }}>
         <CoverRenderer input={liveInput} />
