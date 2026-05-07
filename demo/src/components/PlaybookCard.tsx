@@ -41,7 +41,10 @@ export function PlaybookCard({ p }: { p: ExplorePlaybook }) {
         flexDirection: 'column',
         transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
         boxShadow: hovered ? `0 4px 12px -2px ${shadowColor}` : '0 0 0 0 transparent',
-        transition: 'transform 130ms cubic-bezier(0.2,0,0,1), box-shadow 130ms cubic-bezier(0.2,0,0,1)',
+        // Match alva-freshman: lift smoothly on enter, snap back on leave.
+        transition: hovered
+          ? 'transform 130ms cubic-bezier(0.2, 0, 0, 1), box-shadow 130ms cubic-bezier(0.2, 0, 0, 1)'
+          : 'none',
       }}
     >
       <div style={{
