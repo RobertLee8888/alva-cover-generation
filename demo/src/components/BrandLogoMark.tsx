@@ -2,20 +2,27 @@
 // as <BrandLogo> but smaller and inline (not inside <foreignObject>).
 
 import { useEffect, useRef, useState } from 'react';
-import { materialSymbolUrl } from '@skill/icon-mapping';
 
 const JSDELIVR = (slug: string) =>
   `https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/${slug}.svg`;
 const SIMPLEICONS_BLACK = (slug: string) =>
   `https://cdn.simpleicons.org/${slug}/000000`;
-const MATERIAL = (name: string) => materialSymbolUrl(name);
 
+/**
+ * Inline brand mark for tag pills. Renders ONLY when a real brand logo
+ * loads from simpleicons. If both CDN sources fail (no real logo for
+ * the ticker — common for ETFs and many industrials), returns null so
+ * the tag shows only the ticker text. Never falls back to a generic
+ * Material Symbol — that produced wrong "chip" icons on LMT / RTX / etc.
+ *
+ * `fallbackSymbol` arg is accepted for API compatibility but ignored.
+ */
 export function BrandLogoMark({
-  slug, color, fallbackSymbol, size = 10,
+  slug, color, size = 10,
 }: {
   slug: string;
   color: string;
-  fallbackSymbol: string;
+  fallbackSymbol?: string;
   size?: number;
 }) {
   const sources = [JSDELIVR(slug), SIMPLEICONS_BLACK(slug)];
@@ -35,8 +42,11 @@ export function BrandLogoMark({
     return () => { cancelled = true; };
   }, [attempt, slug]);
 
+  // Both CDNs failed → no real logo exists. Render nothing.
+  if (attempt >= sources.length) return null;
+
   const colorCss = color.startsWith('#') ? color : `#${color}`;
-  const url = attempt < sources.length ? sources[attempt]! : MATERIAL(fallbackSymbol);
+  const url = sources[attempt]!;
 
   return (
     <span style={{
