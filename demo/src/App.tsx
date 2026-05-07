@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { PLAYBOOKS } from './data/playbooks';
+import { PLAYBOOKS, resolveCard } from './data/playbooks';
 import { PlaybookCard } from './components/PlaybookCard';
 import { LocaleSwitcher } from './components/LocaleSwitcher';
 import { STRINGS } from './i18n';
@@ -65,7 +65,7 @@ export function App() {
         {filtered.map((p, i) => (
           <PlaybookCard
             key={p.id + locale}
-            p={{ ...p, cover: { ...p.cover, locale } }}
+            p={resolveCard(p, locale)}
             staggerMs={i * 250}
           />
         ))}
